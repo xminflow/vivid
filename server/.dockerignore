@@ -1,0 +1,16 @@
+# 密钥绝不进镜像，环境变量由部署平台注入
+.env
+.env.local
+
+# 本地虚拟环境与缓存，镜像里会重新装
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# 运行时不需要
+tests/
+README.md
+schema.sql
+Dockerfile
+.dockerignore
