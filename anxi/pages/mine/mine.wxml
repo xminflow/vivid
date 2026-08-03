@@ -1,0 +1,6 @@
+<!--mine.wxml 我的（QA-04 待实现）-->
+<view class="placeholder">
+  <view class="rule"></view>
+  <text class="title">我的</text>
+  <text class="desc">预约记录与客服入口，等预约功能上线后在这里查看。</text>
+</view>

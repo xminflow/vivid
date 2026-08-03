@@ -1,0 +1,117 @@
+<!--index.wxml 首页：实拍画廊（压品牌陈述）+ 展厅预约-->
+<view class="page">
+
+  <!-- 上：实拍画廊，品牌陈述压在图上 -->
+  <view class="hero" style="height:{{heroHeight}}px">
+    <swiper
+      class="hero-swiper"
+      autoplay
+      circular
+      interval="5000"
+      duration="700"
+      bindchange="onHeroChange"
+    >
+      <swiper-item wx:for="{{heroSlides}}" wx:key="image">
+        <image class="hero-image" src="{{item.image}}" mode="aspectFill" lazy-load />
+      </swiper-item>
+    </swiper>
+
+    <!-- 上下各压一道暗渐变：照片再亮，压在上面的字也读得清 -->
+    <view class="veil veil-top" style="height:{{statusBarHeight + 140}}px"></view>
+    <view class="veil veil-bottom"></view>
+
+    <view class="topbar" style="padding-top:{{statusBarHeight + 18}}px">
+      <text class="wordmark {{settled ? 'wordmark-settled' : ''}}">{{brand.wordmark}}</text>
+      <text class="topbar-sub">{{brand.city}}</text>
+    </view>
+
+    <view class="hero-foot">
+      <text class="statement-heading">{{about.heading}}</text>
+      <text class="statement-body">{{about.body}}</text>
+      <view class="statement-rule"></view>
+      <text class="statement-closing">{{about.closing}}</text>
+
+      <view class="ticks">
+        <view
+          class="tick {{index === heroIndex ? 'tick-on' : ''}}"
+          wx:for="{{heroSlides}}"
+          wx:key="image"
+        ></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 下：展厅预约。内嵌画廊，按参观动线排 -->
+  <view class="section">
+    <view class="head">
+      <text class="head-title">展厅预约</text>
+      <text class="head-en">Visit</text>
+    </view>
+
+    <!-- 内嵌画廊：一屏一间，左右滑动，不露下一张。页码压在图片内侧下沿 -->
+    <view class="gallery-wrap">
+      <swiper
+        class="gallery"
+        circular
+        duration="360"
+        bindchange="onSpaceChange"
+      >
+        <swiper-item wx:for="{{spaces}}" wx:key="id">
+          <view class="card">
+            <image class="card-image" src="{{item.image}}" mode="aspectFill" lazy-load />
+            <!-- 照片有亮有暗，压一道渐变，白色页码才始终读得出来 -->
+            <view class="card-veil"></view>
+
+            <view class="card-bar">
+              <view class="card-info">
+                <view class="card-nameline">
+                  <text class="card-ordinal">{{item.ordinal}}</text>
+                  <text class="card-name">{{item.name}} {{item.en}}</text>
+                </view>
+                <text class="card-meta">{{item.hours}}</text>
+                <text class="card-meta">{{brand.city}} · {{item.floor}}</text>
+              </view>
+              <view
+                class="card-cta"
+                hover-class="card-cta-hover"
+                hover-stay-time="120"
+                data-id="{{item.id}}"
+                data-name="{{item.name}}"
+                bindtap="onBook"
+              >
+                <text class="card-cta-line">立即</text>
+                <text class="card-cta-line">预约</text>
+              </view>
+            </view>
+          </view>
+        </swiper-item>
+      </swiper>
+
+      <!-- 页码浮在 swiper 之上，压在图片下沿，不跟着某一张卡片走 -->
+      <view class="gallery-ticks">
+        <view
+          class="gtick {{index === spaceIndex ? 'gtick-on' : ''}}"
+          wx:for="{{spaces}}"
+          wx:key="id"
+        ></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 活动预告：整张海报铺出来，文案都在图里，页面不再另起一套字 -->
+  <view class="section">
+    <view class="head">
+      <text class="head-title">近期活动</text>
+      <text class="head-en">Events</text>
+    </view>
+
+    <image
+      class="poster"
+      src="{{activity.image}}"
+      mode="widthFix"
+      lazy-load
+      show-menu-by-longpress
+    />
+  </view>
+
+</view>

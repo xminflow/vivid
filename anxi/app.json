@@ -1,0 +1,38 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/gallery/gallery",
+    "pages/mine/mine"
+  ],
+  "window": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "全案展厅",
+    "navigationBarBackgroundColor": "#F2EFE7",
+    "backgroundColor": "#F2EFE7",
+    "backgroundTextStyle": "light"
+  },
+  "tabBar": {
+    "color": "#6E6A61",
+    "selectedColor": "#7D9C8E",
+    "backgroundColor": "#F2EFE7",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/gallery/gallery",
+        "text": "展厅"
+      },
+      {
+        "pagePath": "pages/mine/mine",
+        "text": "我的"
+      }
+    ]
+  },
+  "style": "v2",
+  "componentFramework": "glass-easel",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

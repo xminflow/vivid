@@ -1,0 +1,47 @@
+<!--service.wxml 五个服务，每个可单独申请-->
+<view class="page">
+
+  <view class="hd">
+    <text class="hd-title">服务</text>
+    <text class="hd-en">Services</text>
+  </view>
+
+  <view class="intro">
+    <text class="intro-heading">{{intro.heading}}</text>
+    <text class="intro-body">{{intro.body}}</text>
+  </view>
+
+  <!-- 卡片上只放摘要，整段介绍在申请页里，避免这页变成一堵字墙 -->
+  <view
+    class="item"
+    wx:for="{{services}}"
+    wx:key="id"
+    hover-class="item-hover"
+    hover-stay-time="120"
+    data-id="{{item.id}}"
+    bindtap="onApply"
+  >
+    <view class="item-head">
+      <text class="item-ordinal">{{item.ordinal}}</text>
+      <view class="item-title">
+        <text class="item-name">{{item.name}}</text>
+        <text class="item-tagline">{{item.tagline}}</text>
+      </view>
+    </view>
+
+    <text class="item-intro">{{item.intro}}</text>
+
+    <view class="item-foot">
+      <text class="item-note" wx:if="{{item.note}}">注 · {{item.note}}</text>
+      <text class="item-note" wx:else></text>
+      <text class="item-cta">立即申请 ›</text>
+    </view>
+  </view>
+
+  <view class="foot">
+    <button class="contact" open-type="contact" hover-class="none">
+      <text class="contact-text">拿不准选哪项？在线咨询客服</text>
+    </button>
+  </view>
+
+</view>

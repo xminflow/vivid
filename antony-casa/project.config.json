@@ -1,0 +1,57 @@
+{
+  "compileType": "miniprogram",
+  "libVersion": "trial",
+  "packOptions": {
+    "ignore": [
+      {
+        "type": "file",
+        "value": "activity.png",
+        "message": "活动海报原图 1.8MB，进包会顶爆主包 2MB 上限；上线用的是 assets/home/activity.jpg"
+      },
+      {
+        "type": "file",
+        "value": "22e0188f-54ee-4c29-89c3-bad6785ffe38.png",
+        "message": "设计稿参考图，不进包"
+      },
+      {
+        "type": "file",
+        "value": "code.jpg",
+        "message": "顾问微信码原图，页面用的是裁好的 assets/advisor/wechat-qr.png"
+      }
+    ],
+    "include": []
+  },
+  "setting": {
+    "coverView": true,
+    "es6": true,
+    "postcss": true,
+    "minified": true,
+    "enhance": true,
+    "showShadowRootInWxmlPanel": true,
+    "packNpmRelationList": [],
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    },
+    "compileWorklet": false,
+    "uglifyFileName": false,
+    "uploadWithSourceMap": true,
+    "packNpmManually": false,
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "localPlugins": false,
+    "condition": false,
+    "swc": false,
+    "disableSWC": true,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false
+  },
+  "condition": {},
+  "editorSetting": {
+    "tabIndent": "auto",
+    "tabSize": 2
+  },
+  "appid": "wx7bb962db05c7219b",
+  "simulatorPluginLibVersion": {}
+}

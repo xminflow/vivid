@@ -1,0 +1,123 @@
+<!--booking.wxml 预约参观登记-->
+<view class="page">
+
+  <view class="hd">
+    <text class="hd-title">预约参观</text>
+    <text class="hd-en">Book a Visit</text>
+    <text class="hd-sub" wx:if="{{spaceName}}">{{spaceName}} · 杭州展厅</text>
+    <text class="hd-sub" wx:else>杭州展厅</text>
+  </view>
+
+  <view class="form">
+    <view class="row">
+      <text class="label">您的称呼</text>
+      <input
+        class="input"
+        value="{{form.name}}"
+        placeholder="怎么称呼您"
+        placeholder-class="ph"
+        maxlength="40"
+        bindinput="onNameInput"
+      />
+    </view>
+
+    <view class="row">
+      <text class="label">您的电话</text>
+      <input
+        class="input"
+        type="number"
+        value="{{form.phone}}"
+        placeholder="11 位手机号"
+        placeholder-class="ph"
+        maxlength="11"
+        bindinput="onPhoneInput"
+      />
+    </view>
+
+    <picker
+      class="row-picker"
+      range="{{visitorTypes}}"
+      value="{{form.visitorTypeIndex}}"
+      bindchange="onVisitorTypeChange"
+    >
+      <view class="picker-row">
+        <text class="label">来者身份</text>
+        <!-- text 内部的换行和缩进会原样渲染，内容必须贴着标签写成一行 -->
+        <text class="value {{form.visitorTypeIndex < 0 ? 'value-empty' : ''}}">{{form.visitorTypeIndex < 0 ? '请选择' : visitorTypes[form.visitorTypeIndex]}}</text>
+        <text class="chevron">›</text>
+      </view>
+    </picker>
+
+    <picker
+      class="row-picker"
+      mode="date"
+      start="{{today}}"
+      value="{{form.visitDate}}"
+      bindchange="onDateChange"
+    >
+      <view class="picker-row">
+        <text class="label">到访日期</text>
+        <text class="value {{form.visitDate ? '' : 'value-empty'}}">{{form.visitDate ? form.visitDate : '请选择'}}</text>
+        <text class="chevron">›</text>
+      </view>
+    </picker>
+
+    <view class="row">
+      <text class="label">到访人数</text>
+      <view class="stepper">
+        <view
+          class="step {{form.partySize <= 1 ? 'step-off' : ''}}"
+          hover-class="step-hover"
+          data-step="-1"
+          bindtap="onPartyStep"
+        >−</view>
+        <text class="step-num">{{form.partySize}}</text>
+        <view
+          class="step {{form.partySize >= 50 ? 'step-off' : ''}}"
+          hover-class="step-hover"
+          data-step="1"
+          bindtap="onPartyStep"
+        >+</view>
+      </view>
+    </view>
+
+    <picker
+      class="row-picker"
+      range="{{purposes}}"
+      value="{{form.purposeIndex}}"
+      bindchange="onPurposeChange"
+    >
+      <view class="picker-row">
+        <text class="label">预约需求</text>
+        <text class="value {{form.purposeIndex < 0 ? 'value-empty' : ''}}">{{form.purposeIndex < 0 ? '请选择' : purposes[form.purposeIndex]}}</text>
+        <text class="chevron">›</text>
+      </view>
+    </picker>
+
+    <view class="row row-note">
+      <text class="label">备注（选填）</text>
+      <textarea
+        class="textarea"
+        value="{{form.note}}"
+        placeholder="想重点看哪间、有没有特别的需求"
+        placeholder-class="ph-area"
+        maxlength="500"
+        auto-height
+        bindinput="onNoteInput"
+      />
+    </view>
+  </view>
+
+  <view class="foot">
+    <view
+      class="submit {{submitting ? 'submit-off' : ''}}"
+      hover-class="submit-hover"
+      hover-stay-time="120"
+      bindtap="onSubmit"
+    >
+      <text class="submit-text">{{submitting ? '提交中' : '提交预约'}}</text>
+    </view>
+    <text class="foot-note">提交后我们会电话与您确认到访时间</text>
+  </view>
+
+</view>

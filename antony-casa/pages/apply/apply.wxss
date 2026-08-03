@@ -1,0 +1,339 @@
+/* apply.wxss 服务申请 */
+
+.page {
+  min-height: 100vh;
+  padding-bottom: 60rpx;
+  background: var(--sfondo);
+}
+
+/* ---------- 页头 ---------- */
+
+.hd {
+  padding: 48rpx 40rpx 36rpx;
+}
+
+.hd-title {
+  display: block;
+  font-size: 40rpx;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: var(--ls-display);
+  color: var(--nero);
+}
+
+.hd-sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 25rpx;
+  line-height: 1.6;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+}
+
+.hd-intro {
+  display: block;
+  margin-top: 20rpx;
+  font-size: 23rpx;
+  line-height: 1.8;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+}
+
+.hd-note {
+  display: block;
+  margin-top: 18rpx;
+  font-size: 22rpx;
+  line-height: 1.7;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}
+
+/* ---------- 表单 ---------- */
+/* 42rpx = 28 × 1.5，输入框、占位符、picker 的值统一用这个行高。
+   placeholder 是 input 内部另起的节点，不继承字号行高，必须原样写一遍 */
+
+.card {
+  margin: 0 40rpx;
+  background: var(--bianco);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  min-height: 108rpx;
+  padding: 0 32rpx;
+  border-bottom: 1rpx solid var(--hairline);
+}
+
+/* picker 只做块级容器，行样式落在里面那层，两类行才是同一种盒子 */
+.row-picker {
+  display: block;
+  border-bottom: 1rpx solid var(--hairline);
+}
+
+.row:last-child,
+.row-picker:last-child {
+  border-bottom: none;
+}
+
+.picker-row {
+  display: flex;
+  align-items: center;
+  min-height: 108rpx;
+  padding: 0 32rpx;
+}
+
+.label {
+  flex: none;
+  width: 230rpx;
+  font-size: 28rpx;
+  line-height: 1.5;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+}
+
+/* 必填星号跟在标签后面，不另起一列 */
+.req {
+  margin-left: 6rpx;
+  font-size: 22rpx;
+  color: var(--grigio-chiaro);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 42rpx;
+  padding: 0;
+  font-size: 28rpx;
+  line-height: 42rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+}
+
+.ph {
+  font-size: 28rpx;
+  line-height: 42rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}
+
+/* 单位贴在输入框右边，跟数字同一条基线 */
+.unit {
+  flex: none;
+  margin-left: 12rpx;
+  font-size: 24rpx;
+  line-height: 42rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+}
+
+.value {
+  flex: 1;
+  min-width: 0;
+  font-size: 28rpx;
+  line-height: 42rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+}
+
+.value-empty {
+  color: var(--grigio-chiaro);
+}
+
+.chevron {
+  flex: none;
+  margin-left: 16rpx;
+  font-size: 32rpx;
+  line-height: 1;
+  color: var(--grigio-chiaro);
+}
+
+/* 多行行高比单行松一档，label 跟着走同一个数才顶得齐 */
+.row-area {
+  align-items: flex-start;
+  padding-top: 30rpx;
+  padding-bottom: 30rpx;
+}
+
+.row-area .label {
+  line-height: 45rpx;
+}
+
+.textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 120rpx;
+  padding: 0;
+  font-size: 28rpx;
+  line-height: 45rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+}
+
+.ph-area {
+  font-size: 28rpx;
+  line-height: 45rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}
+
+/* ---------- 图片上传 ---------- */
+
+.block {
+  margin-top: 44rpx;
+}
+
+.block-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 40rpx 20rpx;
+}
+
+.block-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+}
+
+.block-count {
+  font-size: 21rpx;
+  line-height: 1.5;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}
+
+/* 一行三个：(100% - 两条 20rpx 间距) / 3 */
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 0 40rpx;
+}
+
+.cell {
+  position: relative;
+  width: 200rpx;
+  height: 200rpx;
+  margin: 0 20rpx 20rpx 0;
+  background: var(--bianco);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* 每行第三个不留右边距 */
+.cell:nth-child(3n) {
+  margin-right: 0;
+}
+
+.thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.thumb-mask {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48rpx;
+  background: rgba(17, 17, 17, 0.62);
+}
+
+.thumb-mask-text {
+  font-size: 20rpx;
+  line-height: 1.4;
+  letter-spacing: var(--ls-meta);
+  color: var(--su-foto);
+}
+
+/* 删除按钮压在右上角，点它不要连带触发预览，所以 wxml 里用的是 catchtap */
+.cell-del {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52rpx;
+  height: 52rpx;
+  background: rgba(17, 17, 17, 0.55);
+  border-radius: 0 var(--radius) 0 var(--radius);
+}
+
+.cell-del-text {
+  font-size: 30rpx;
+  line-height: 1;
+  color: var(--su-foto);
+}
+
+.cell-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1rpx dashed rgba(17, 17, 17, 0.2);
+}
+
+.cell-add-hover {
+  background: var(--bianco);
+}
+
+.cell-add-plus {
+  font-size: 44rpx;
+  line-height: 1;
+  color: var(--grigio-chiaro);
+}
+
+/* ---------- 提交 ---------- */
+
+.foot {
+  padding: 48rpx 40rpx 0;
+}
+
+/* 描边款，跟预约表单的提交按钮同一套 */
+.submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 96rpx;
+  background: transparent;
+  border: 1rpx solid var(--nero);
+  border-radius: var(--radius);
+}
+
+.submit-hover {
+  background: var(--nero);
+}
+
+.submit-hover .submit-text {
+  color: var(--bianco);
+}
+
+.submit-off {
+  opacity: 0.45;
+}
+
+.submit-text {
+  font-size: 30rpx;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: var(--nero);
+}
+
+.foot-note {
+  display: block;
+  margin-top: 24rpx;
+  text-align: center;
+  font-size: 22rpx;
+  line-height: 1.8;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+}

@@ -1,0 +1,264 @@
+/**index.wxss**/
+.page {
+  background: var(--xuan);
+  padding-bottom: 48rpx;
+}
+
+/* ---------- 首屏 ---------- */
+.hero {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+.hero-swiper,
+.hero-image {
+  width: 100%;
+  height: 100%;
+}
+
+.veil {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+
+.veil-top {
+  top: 0;
+  background: linear-gradient(to bottom, rgba(242, 239, 231, 0.86), rgba(242, 239, 231, 0));
+}
+
+.veil-bottom {
+  bottom: 0;
+  height: 240rpx;
+  background: linear-gradient(to top, rgba(242, 239, 231, 0.92), rgba(242, 239, 231, 0));
+}
+
+.topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: auto;
+  padding-left: 40rpx;
+  padding-right: 40rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: content-box;
+}
+
+.topbar-name {
+  font-size: 28rpx;
+  letter-spacing: var(--ls-label);
+  color: var(--mo);
+  line-height: 88rpx;
+}
+
+.topbar-city {
+  font-size: 22rpx;
+  letter-spacing: var(--ls-label);
+  color: var(--dan-mo);
+  line-height: 88rpx;
+}
+
+/* 题签条：一条宣纸压在图上，竖排题字写在上面 */
+.title-band {
+  position: absolute;
+  right: 40rpx;
+  width: 92rpx;
+  padding: 28rpx 0 24rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(250, 248, 242, 0.92);
+}
+
+.title-char {
+  font-size: 34rpx;
+  line-height: 1.62;
+  color: var(--mo);
+  letter-spacing: 0;
+}
+
+.seal {
+  margin-top: 22rpx;
+  width: 46rpx;
+  height: 46rpx;
+  background: var(--zhu-sha);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.seal-text {
+  font-size: 17rpx;
+  line-height: 1.05;
+  width: 24rpx;
+  text-align: center;
+  color: #FAF8F2;
+}
+
+.hero-foot {
+  position: absolute;
+  left: 40rpx;
+  right: 40rpx;
+  bottom: 44rpx;
+}
+
+.hero-note {
+  display: block;
+  font-size: 26rpx;
+  color: var(--mo);
+  margin-bottom: 22rpx;
+}
+
+.ticks {
+  display: flex;
+  align-items: center;
+}
+
+/* 指示器做成卷轴刻度，不是圆点 */
+.tick {
+  width: 16rpx;
+  height: 3rpx;
+  margin-right: 10rpx;
+  background: rgba(28, 26, 23, 0.28);
+  transition: width 240ms ease, background 240ms ease;
+}
+
+.tick-on {
+  width: 44rpx;
+  background: var(--qing-ci);
+}
+
+.counter {
+  margin-left: 20rpx;
+  font-size: 20rpx;
+  letter-spacing: var(--ls-label);
+  color: var(--dan-mo);
+}
+
+/* ---------- 预约区 ---------- */
+.section {
+  padding: 56rpx 0 0;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  padding: 0 40rpx;
+}
+
+.eyebrow-rule {
+  width: 48rpx;
+  height: 2rpx;
+  background: var(--qing-ci);
+  margin-right: 20rpx;
+}
+
+.eyebrow-text {
+  font-size: 24rpx;
+  letter-spacing: var(--ls-label);
+  color: var(--qing-ci);
+}
+
+.eyebrow-aside {
+  margin-left: auto;
+  font-size: 22rpx;
+  letter-spacing: var(--ls-label);
+  color: var(--dan-mo);
+}
+
+.section-desc {
+  display: block;
+  padding: 18rpx 40rpx 0;
+  font-size: 26rpx;
+  color: var(--dan-mo);
+}
+
+.space-swiper {
+  height: 640rpx;
+  margin-top: 36rpx;
+  padding-left: 40rpx;
+}
+
+/* 不写 width：块级元素自己占满，右边的 margin 才是卡间距而不是溢出 */
+.card {
+  height: 100%;
+  margin-right: 24rpx;
+  background: var(--sheng-xuan);
+  overflow: hidden;
+  opacity: 0.55;
+  transition: opacity 260ms ease;
+}
+
+.card-on {
+  opacity: 1;
+}
+
+.card-image {
+  width: 100%;
+  height: 360rpx;
+  display: block;
+}
+
+.card-body {
+  padding: 28rpx 32rpx 0;
+}
+
+.card-head {
+  display: flex;
+  align-items: baseline;
+}
+
+.card-ordinal {
+  font-size: 24rpx;
+  color: var(--qing-ci);
+  margin-right: 18rpx;
+}
+
+.card-name {
+  font-size: 34rpx;
+  letter-spacing: 0.12em;
+  color: var(--mo);
+}
+
+.card-note {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 25rpx;
+  line-height: 1.7;
+  color: var(--dan-mo);
+}
+
+.card-cta {
+  margin-top: 24rpx;
+  padding: 22rpx 0;
+  border-top: 1rpx solid var(--hairline);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-cta-hover {
+  opacity: 0.6;
+}
+
+.card-cta-text {
+  font-size: 26rpx;
+  letter-spacing: var(--ls-label);
+  color: var(--qing-ci);
+}
+
+.card-cta-arrow {
+  font-size: 26rpx;
+  color: var(--qing-ci);
+}
+
+.footnote {
+  padding: 40rpx 40rpx 0;
+  font-size: 22rpx;
+  color: var(--dan-mo);
+}

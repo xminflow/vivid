@@ -1,0 +1,324 @@
+/* mine.wxss 我的 */
+
+.page {
+  min-height: 100vh;
+  padding-bottom: 60rpx;
+  background: var(--sfondo);
+}
+
+/* ---------- 页头 ---------- */
+
+.hd {
+  padding: 56rpx 40rpx 0;
+}
+
+.hd-title {
+  display: block;
+  font-size: 44rpx;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: var(--ls-display);
+  color: var(--nero);
+}
+
+.hd-en {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 26rpx;
+  line-height: 1.4;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}
+
+/* ---------- 分块 ---------- */
+
+.block {
+  margin-top: 48rpx;
+}
+
+.block-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 40rpx 20rpx;
+}
+
+.block-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+}
+
+.card {
+  margin: 0 40rpx;
+  background: var(--bianco);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* ---------- 资料行 ---------- */
+/* 跟预约表单同一套：42rpx = 28 × 1.5，输入框、占位符、picker 的值统一用这个行高。
+   placeholder 是 input 内部另起的节点，不继承 .input 的字号行高，必须原样写一遍 */
+
+.row {
+  display: flex;
+  align-items: center;
+  min-height: 108rpx;
+  padding: 0 32rpx;
+  border-bottom: 1rpx solid var(--hairline);
+}
+
+/* picker 只做块级容器，行样式落在里面那层，两类行才是同一种盒子 */
+.row-picker {
+  display: block;
+  border-bottom: 1rpx solid var(--hairline);
+}
+
+.row:last-child,
+.row-picker:last-child {
+  border-bottom: none;
+}
+
+.picker-row {
+  display: flex;
+  align-items: center;
+  min-height: 108rpx;
+  padding: 0 32rpx;
+}
+
+.label {
+  flex: none;
+  width: 190rpx;
+  font-size: 28rpx;
+  line-height: 1.5;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 42rpx;
+  padding: 0;
+  font-size: 28rpx;
+  line-height: 42rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+}
+
+.ph {
+  font-size: 28rpx;
+  line-height: 42rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}
+
+.value {
+  flex: 1;
+  min-width: 0;
+  font-size: 28rpx;
+  line-height: 42rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+}
+
+.value-empty {
+  color: var(--grigio-chiaro);
+}
+
+.chevron {
+  flex: none;
+  margin-left: 16rpx;
+  font-size: 32rpx;
+  line-height: 1;
+  color: var(--grigio-chiaro);
+}
+
+/* ---------- 我的顾问 ---------- */
+
+.card-advisor {
+  padding: 36rpx 32rpx 32rpx;
+}
+
+.adv-hi {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: var(--ls-display);
+  color: var(--nero);
+}
+
+.adv-line {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 25rpx;
+  line-height: 1.75;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+}
+
+/* 号码单独拎出来做一条可点的行，跟正文区分开 */
+.adv-phone {
+  display: flex;
+  align-items: center;
+  margin-top: 24rpx;
+  padding: 24rpx 28rpx;
+  background: var(--sfondo);
+  border-radius: var(--radius);
+}
+
+.adv-phone-hover {
+  opacity: 0.6;
+}
+
+.adv-phone-label {
+  flex: none;
+  margin-right: 20rpx;
+  font-size: 23rpx;
+  line-height: 1.5;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+}
+
+.adv-phone-num {
+  flex: 1;
+  min-width: 0;
+  font-size: 32rpx;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  color: var(--nero);
+}
+
+.adv-phone-act {
+  flex: none;
+  margin-left: 20rpx;
+  padding: 6rpx 18rpx;
+  font-size: 21rpx;
+  line-height: 1.5;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+  border: 1rpx solid var(--nero);
+  border-radius: 6rpx;
+}
+
+/* 二维码给到 340rpx，长按识别在这个尺寸下稳。
+   底色必须是白的——码的静默区就是白底，衬米色会吃掉边界 */
+.adv-qr {
+  display: block;
+  width: 340rpx;
+  margin: 24rpx auto 0;
+  background: var(--bianco);
+}
+
+/* 图还没到位时占住位置，不出裂图 */
+.adv-qr-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 340rpx;
+  height: 340rpx;
+  margin: 24rpx auto 0;
+  border: 1rpx dashed rgba(17, 17, 17, 0.2);
+  border-radius: var(--radius);
+}
+
+.adv-qr-slot-text {
+  font-size: 22rpx;
+  line-height: 1.6;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}
+
+/* ---------- 预约记录 ---------- */
+
+.rec {
+  display: flex;
+  align-items: center;
+  min-height: 132rpx;
+  padding: 26rpx 32rpx;
+  border-bottom: 1rpx solid var(--hairline);
+}
+
+.rec:last-child {
+  border-bottom: none;
+}
+
+.rec-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.rec-date {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+}
+
+.rec-meta {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+}
+
+/* 状态只有一档，做成描边小签，不用颜色区分 */
+.rec-state {
+  flex: none;
+  margin-left: 24rpx;
+  padding: 6rpx 16rpx;
+  font-size: 21rpx;
+  line-height: 1.5;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+  border: 1rpx solid var(--hairline);
+  border-radius: 6rpx;
+}
+
+/* ---------- 空态 ---------- */
+
+.empty {
+  padding: 64rpx 40rpx 68rpx;
+  text-align: center;
+}
+
+.empty-text {
+  display: block;
+  font-size: 25rpx;
+  line-height: 1.6;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}
+
+/* ---------- 落款 ---------- */
+
+.foot {
+  padding: 72rpx 40rpx 0;
+  text-align: center;
+}
+
+.foot-brand {
+  display: block;
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.16em;
+  color: var(--grigio-chiaro);
+}
+
+.foot-city {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 21rpx;
+  line-height: 1.6;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}

@@ -1,0 +1,25 @@
+[project]
+name = "vivid-server"
+version = "0.1.0"
+description = "小程序矩阵后端：展厅预约登记"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "psycopg[binary,pool]>=3.2",
+    "pydantic>=2.9",
+    "python-dotenv>=1.0",
+    # 调微信 code2session 换 openid 用（原先只在测试里用）
+    "httpx>=0.27",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+# 没做成可安装包，测试直接从仓库根导入 app
+pythonpath = ["."]

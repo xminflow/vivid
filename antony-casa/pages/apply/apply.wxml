@@ -1,0 +1,137 @@
+<!--apply.wxml 服务申请。字段由 mock/service.js 驱动，这里只负责按类型渲染-->
+<view class="page" wx:if="{{service}}">
+
+  <view class="hd">
+    <text class="hd-title">{{service.name}}</text>
+    <text class="hd-sub">{{service.tagline}}</text>
+    <!-- 列表页只露三行，整段介绍放在这里 -->
+    <text class="hd-intro">{{service.intro}}</text>
+    <text class="hd-note" wx:if="{{service.note}}">注 · {{service.note}}</text>
+  </view>
+
+  <view class="card">
+    <block wx:for="{{rows}}" wx:key="id" wx:for-index="i">
+
+      <!-- 单行输入：text / phone / number -->
+      <view class="row" wx:if="{{item.type === 'text' || item.type === 'phone' || item.type === 'number'}}">
+        <text class="label">{{item.label}}<text class="req" wx:if="{{item.required}}">＊</text></text>
+        <input
+          class="input"
+          type="{{item.type === 'text' ? 'text' : (item.type === 'phone' ? 'number' : 'digit')}}"
+          value="{{item.value}}"
+          placeholder="{{item.placeholder || '请填写'}}"
+          placeholder-class="ph"
+          maxlength="{{item.type === 'phone' ? 11 : (item.maxlength || 40)}}"
+          data-i="{{i}}"
+          bindinput="onInput"
+        />
+        <text class="unit" wx:if="{{item.unit}}">{{item.unit}}</text>
+      </view>
+
+      <!-- 选择器 -->
+      <picker
+        class="row-picker"
+        wx:elif="{{item.type === 'select'}}"
+        range="{{item.options}}"
+        value="{{item.index}}"
+        data-i="{{i}}"
+        bindchange="onSelect"
+      >
+        <view class="picker-row">
+          <text class="label">{{item.label}}<text class="req" wx:if="{{item.required}}">＊</text></text>
+          <text class="value {{item.text ? '' : 'value-empty'}}">{{item.text ? item.text : '请选择'}}</text>
+          <text class="chevron">›</text>
+        </view>
+      </picker>
+
+      <!-- 省市区 -->
+      <picker
+        class="row-picker"
+        wx:elif="{{item.type === 'region'}}"
+        mode="region"
+        value="{{item.region}}"
+        data-i="{{i}}"
+        bindchange="onRegion"
+      >
+        <view class="picker-row">
+          <text class="label">{{item.label}}<text class="req" wx:if="{{item.required}}">＊</text></text>
+          <text class="value {{item.text ? '' : 'value-empty'}}">{{item.text ? item.text : '请选择'}}</text>
+          <text class="chevron">›</text>
+        </view>
+      </picker>
+
+      <!-- 多行 -->
+      <view class="row row-area" wx:else>
+        <text class="label">{{item.label}}<text class="req" wx:if="{{item.required}}">＊</text></text>
+        <textarea
+          class="textarea"
+          value="{{item.value}}"
+          placeholder="{{item.placeholder || '选填'}}"
+          placeholder-class="ph-area"
+          maxlength="{{item.maxlength || 500}}"
+          auto-height
+          data-i="{{i}}"
+          bindinput="onInput"
+        />
+      </view>
+
+    </block>
+  </view>
+
+  <!-- 图片上传，每组一个九宫格 -->
+  <view class="block" wx:for="{{groups}}" wx:key="id" wx:for-index="g">
+    <view class="block-head">
+      <text class="block-title">{{item.label}}</text>
+      <text class="block-count">{{item.files.length}} / 6</text>
+    </view>
+
+    <view class="grid">
+      <view class="cell" wx:for="{{item.files}}" wx:key="path" wx:for-item="file" wx:for-index="i">
+        <image
+          class="thumb"
+          src="{{file.path}}"
+          mode="aspectFill"
+          data-g="{{g}}"
+          data-i="{{i}}"
+          bindtap="onPreviewImage"
+        />
+        <!-- 传完之前压一层，用户知道还没好；失败的标出来让他删掉重选 -->
+        <view class="thumb-mask" wx:if="{{!file.key}}">
+          <text class="thumb-mask-text">{{file.failed ? '上传失败' : '上传中'}}</text>
+        </view>
+        <view
+          class="cell-del"
+          data-g="{{g}}"
+          data-i="{{i}}"
+          catchtap="onRemoveImage"
+        >
+          <text class="cell-del-text">×</text>
+        </view>
+      </view>
+
+      <view
+        class="cell cell-add"
+        wx:if="{{item.files.length < 6}}"
+        hover-class="cell-add-hover"
+        hover-stay-time="120"
+        data-g="{{g}}"
+        bindtap="onPickImage"
+      >
+        <text class="cell-add-plus">＋</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="foot">
+    <view
+      class="submit {{submitting ? 'submit-off' : ''}}"
+      hover-class="submit-hover"
+      hover-stay-time="120"
+      bindtap="onSubmit"
+    >
+      <text class="submit-text">{{submitting ? '提交中' : '提交申请'}}</text>
+    </view>
+    <text class="foot-note">提交后我们会电话与您联系</text>
+  </view>
+
+</view>

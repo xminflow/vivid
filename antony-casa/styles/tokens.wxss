@@ -1,0 +1,30 @@
+/* 设计令牌：黑白无衬线。页面只有黑、白、灰三档，实拍照片是页面上唯一的颜色。
+   字重和字号拉开层级，字距一律收紧——不用衬线，不用大字距。 */
+page {
+  /* 色 */
+  --bianco: #FFFFFF;        /* 纯白：卡片、信息条 */
+  --sfondo: #F5F5F3;        /* 页底：比卡片暗一档，白卡片才浮得起来 */
+  --nero: #111111;          /* 墨黑：标题与正文 */
+  --grigio: #767676;        /* 中灰：副信息，白底 5.4:1 */
+  --grigio-chiaro: #9B9B9B; /* 浅灰：英文副标、「查看全部」 */
+  --hairline: rgba(17, 17, 17, 0.10);
+
+  /* 压在照片上的字用这两档 */
+  --su-foto: #FFFFFF;
+  --su-foto-debole: rgba(255, 255, 255, 0.72);
+
+  /* 中文用苹方，拉丁字母落到 Helvetica 一族的中性无衬线上 */
+  --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Helvetica, "Microsoft YaHei", sans-serif;
+
+  /* 字距：大字收一点才紧凑，小字给一点才透气 */
+  --ls-display: -0.02em;
+  --ls-meta: 0.02em;
+
+  --radius: 16rpx;
+
+  background: var(--sfondo);
+  color: var(--nero);
+  font-family: var(--sans);
+  font-size: 28rpx;
+  line-height: 1.7;
+}

@@ -1,0 +1,167 @@
+/* service.wxss 服务列表 */
+
+.page {
+  min-height: 100vh;
+  padding-bottom: 60rpx;
+  background: var(--sfondo);
+}
+
+/* ---------- 页头 ---------- */
+
+.hd {
+  padding: 56rpx 40rpx 0;
+}
+
+.hd-title {
+  display: block;
+  font-size: 44rpx;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: var(--ls-display);
+  color: var(--nero);
+}
+
+.hd-en {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 26rpx;
+  line-height: 1.4;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}
+
+/* ---------- 开篇一段 ---------- */
+
+.intro {
+  padding: 44rpx 40rpx 40rpx;
+}
+
+.intro-heading {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: var(--ls-display);
+  color: var(--nero);
+}
+
+.intro-body {
+  display: block;
+  margin-top: 14rpx;
+  font-size: 25rpx;
+  line-height: 1.75;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+}
+
+/* ---------- 服务卡 ---------- */
+
+.item {
+  margin: 0 40rpx 24rpx;
+  padding: 36rpx 32rpx 28rpx;
+  background: var(--bianco);
+  border-radius: var(--radius);
+}
+
+.item-hover {
+  opacity: 0.72;
+}
+
+.item-head {
+  display: flex;
+  align-items: flex-start;
+}
+
+/* 序号跟服务名首行对齐 */
+.item-ordinal {
+  flex: none;
+  width: 64rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}
+
+.item-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.item-name {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+}
+
+.item-tagline {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 23rpx;
+  line-height: 1.6;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+}
+
+/* 介绍原文很长，这里只露三行，整段在申请页里 */
+.item-intro {
+  display: -webkit-box;
+  margin-top: 22rpx;
+  font-size: 23rpx;
+  line-height: 1.75;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.item-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 24rpx;
+  padding-top: 22rpx;
+  border-top: 1rpx solid var(--hairline);
+}
+
+.item-note {
+  flex: 1;
+  min-width: 0;
+  margin-right: 20rpx;
+  font-size: 21rpx;
+  line-height: 1.6;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}
+
+.item-cta {
+  flex: none;
+  font-size: 26rpx;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--nero);
+}
+
+/* ---------- 客服 ---------- */
+
+.foot {
+  padding: 32rpx 40rpx 0;
+}
+
+.contact {
+  display: block;
+  text-align: center;
+}
+
+.contact-text {
+  font-size: 25rpx;
+  line-height: 1.6;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+  text-decoration: underline;
+}

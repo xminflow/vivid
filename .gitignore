@@ -1,0 +1,26 @@
+# 爬虫项目整体不入库
+scraper/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+
+# 小程序构建产物
+miniprogram_npm/
+
+# 环境变量与本地配置
+.env
+.env.local
+
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

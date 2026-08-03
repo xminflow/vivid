@@ -1,0 +1,21 @@
+@import "styles/tokens.wxss";
+
+view,
+text,
+image,
+button {
+  box-sizing: border-box;
+}
+
+/* 小程序默认给 button 一圈边框与灰底，页面里的按钮都是自绘的，先清掉 */
+button {
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+button::after {
+  border: none;
+}

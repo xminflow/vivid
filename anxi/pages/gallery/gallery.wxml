@@ -1,0 +1,6 @@
+<!--gallery.wxml 展厅陈列（QA-02 待实现）-->
+<view class="placeholder">
+  <view class="rule"></view>
+  <text class="title">展厅陈列</text>
+  <text class="desc">展厅内的家具与软装正在整理，开业前上架。</text>
+</view>

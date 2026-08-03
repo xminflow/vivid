@@ -1,0 +1,94 @@
+<!--index.wxml 首页-->
+<view class="page">
+
+  <!-- 首屏：占屏 2/3 的展厅轮播 -->
+  <view class="hero" style="height:{{heroHeight}}px">
+    <swiper
+      class="hero-swiper"
+      autoplay
+      circular
+      interval="5000"
+      duration="800"
+      bindchange="onHeroChange"
+    >
+      <swiper-item wx:for="{{heroSlides}}" wx:key="image">
+        <image class="hero-image" src="{{item.image}}" mode="aspectFill" lazy-load />
+      </swiper-item>
+    </swiper>
+
+    <!-- 顶部与底部各一道宣白渐变：图片再花，压在上面的字也读得清 -->
+    <view class="veil veil-top" style="height:{{statusBarHeight + 56}}px"></view>
+    <view class="veil veil-bottom"></view>
+
+    <view class="topbar" style="padding-top:{{statusBarHeight}}px">
+      <text class="topbar-name">全案展厅</text>
+      <text class="topbar-city">杭州 · 开业筹备中</text>
+    </view>
+
+    <!-- 题签：竖排题字压在宣纸条上，底下一枚朱砂印 -->
+    <view class="title-band" style="top:{{statusBarHeight + 56}}px">
+      <text class="title-char" wx:for="{{titleChars}}" wx:key="index">{{item}}</text>
+      <view class="seal">
+        <text class="seal-text">全案</text>
+      </view>
+    </view>
+
+    <view class="hero-foot">
+      <text class="hero-note">{{heroSlides[heroIndex].note}}</text>
+      <view class="ticks">
+        <view
+          class="tick {{index === heroIndex ? 'tick-on' : ''}}"
+          wx:for="{{heroSlides}}"
+          wx:key="image"
+        ></view>
+        <text class="counter">{{current}} / {{total}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 展厅预约 -->
+  <view class="section">
+    <view class="eyebrow">
+      <view class="eyebrow-rule"></view>
+      <text class="eyebrow-text">预约到店</text>
+      <text class="eyebrow-aside">六个空间</text>
+    </view>
+    <text class="section-desc">按参观动线排的。约一间来看，或者整条线走一遍，都可以。</text>
+
+    <swiper
+      class="space-swiper"
+      circular
+      previous-margin="0"
+      next-margin="96rpx"
+      bindchange="onSpaceChange"
+    >
+      <swiper-item wx:for="{{spaces}}" wx:key="id">
+        <view class="card {{index === spaceIndex ? 'card-on' : ''}}">
+          <image class="card-image" src="{{item.image}}" mode="aspectFill" lazy-load />
+          <view class="card-body">
+            <view class="card-head">
+              <text class="card-ordinal">{{item.ordinal}}</text>
+              <text class="card-name">{{item.name}}</text>
+            </view>
+            <text class="card-note">{{item.note}}</text>
+            <view
+              class="card-cta"
+              hover-class="card-cta-hover"
+              data-id="{{item.id}}"
+              data-name="{{item.name}}"
+              bindtap="onBook"
+            >
+              <text class="card-cta-text">预约看这间</text>
+              <text class="card-cta-arrow">→</text>
+            </view>
+          </view>
+        </view>
+      </swiper-item>
+    </swiper>
+
+    <view class="footnote">
+      <text>展厅地址与可约时段将在开业前公布</text>
+    </view>
+  </view>
+
+</view>

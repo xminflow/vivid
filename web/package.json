@@ -1,0 +1,25 @@
+{
+  "name": "anxuan-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "安选材料库 —— 对照 mulook 核验采集数据的前端",
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "node server/index.js",
+    "dev:web": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "element-plus": "^2.8.8",
+    "pg": "^8.13.1",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "concurrently": "^9.1.0",
+    "vite": "^6.0.5"
+  }
+}

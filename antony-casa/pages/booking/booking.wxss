@@ -1,0 +1,239 @@
+/* booking.wxss 预约参观登记 */
+
+.page {
+  min-height: 100vh;
+  padding-bottom: 60rpx;
+  background: var(--sfondo);
+}
+
+/* ---------- 页头 ---------- */
+
+.hd {
+  padding: 56rpx 40rpx 40rpx;
+}
+
+.hd-title {
+  display: block;
+  font-size: 44rpx;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: var(--ls-display);
+  color: var(--nero);
+}
+
+.hd-en {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 26rpx;
+  line-height: 1.4;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}
+
+.hd-sub {
+  display: block;
+  margin-top: 18rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+}
+
+/* ---------- 表单 ---------- */
+
+.form {
+  margin: 0 40rpx;
+  background: var(--bianco);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  min-height: 108rpx;
+  padding: 0 32rpx;
+  border-bottom: 1rpx solid var(--hairline);
+}
+
+/* picker 只做块级容器，行样式全部落在里面那层，
+   这样 .picker-row 和 .row 是同一种盒子，两类行才对得齐 */
+.row-picker {
+  display: block;
+  border-bottom: 1rpx solid var(--hairline);
+}
+
+.picker-row {
+  display: flex;
+  align-items: center;
+  min-height: 108rpx;
+  padding: 0 32rpx;
+}
+
+.label {
+  flex: none;
+  width: 190rpx;
+  font-size: 28rpx;
+  line-height: 1.5;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+}
+
+/* 42rpx = 28 × 1.5，输入框、占位符、picker 的值统一用这一个行高。
+   placeholder 是 input 内部另起的一个节点，不继承 .input 的字号行高，
+   必须原样写一遍，两层文字才叠得住。 */
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 42rpx;
+  padding: 0;
+  font-size: 28rpx;
+  line-height: 42rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+}
+
+.ph {
+  font-size: 28rpx;
+  line-height: 42rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}
+
+.value {
+  flex: 1;
+  min-width: 0;
+  font-size: 28rpx;
+  line-height: 42rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+}
+
+.value-empty {
+  color: var(--grigio-chiaro);
+}
+
+.chevron {
+  flex: none;
+  margin-left: 16rpx;
+  font-size: 32rpx;
+  line-height: 1;
+  color: var(--grigio-chiaro);
+}
+
+/* ---------- 人数加减 ---------- */
+
+.stepper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.step {
+  width: 60rpx;
+  height: 60rpx;
+  line-height: 56rpx;
+  text-align: center;
+  font-size: 32rpx;
+  color: var(--nero);
+  border: 1rpx solid var(--hairline);
+  border-radius: 8rpx;
+}
+
+.step-hover {
+  background: var(--sfondo);
+}
+
+.step-off {
+  color: var(--grigio-chiaro);
+}
+
+.step-num {
+  min-width: 96rpx;
+  text-align: center;
+  font-size: 30rpx;
+  font-weight: 600;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+}
+
+/* ---------- 备注 ---------- */
+
+.row-note {
+  align-items: flex-start;
+  padding-top: 30rpx;
+  padding-bottom: 30rpx;
+  border-bottom: none;
+}
+
+/* 顶对齐这一行，label 跟 textarea 用同一个行高就自然齐了，不用再手动垫 */
+.row-note .label {
+  line-height: 45rpx;
+}
+
+/* 备注是多行，行高比单行的 42rpx 松一档，占位符跟着走同一个数 */
+.textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 120rpx;
+  padding: 0;
+  font-size: 28rpx;
+  line-height: 45rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+}
+
+.ph-area {
+  font-size: 28rpx;
+  line-height: 45rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}
+
+/* ---------- 提交 ---------- */
+
+.foot {
+  padding: 48rpx 40rpx 0;
+}
+
+/* 描边款：页面上只有照片有颜色，按钮不抢戏，一条墨线就够 */
+.submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 96rpx;
+  background: transparent;
+  border: 1rpx solid var(--nero);
+  border-radius: var(--radius);
+}
+
+/* 按下去才实心，反白一下给个明确的落点 */
+.submit-hover {
+  background: var(--nero);
+}
+
+.submit-hover .submit-text {
+  color: var(--bianco);
+}
+
+.submit-off {
+  opacity: 0.45;
+}
+
+.submit-text {
+  font-size: 30rpx;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: var(--nero);
+}
+
+.foot-note {
+  display: block;
+  margin-top: 24rpx;
+  text-align: center;
+  font-size: 22rpx;
+  line-height: 1.8;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+}

@@ -1,0 +1,20 @@
+/* 设计令牌：宣纸米白 + 青瓷。全站只在这里定义颜色与字距，页面样式一律引用变量。 */
+page {
+  /* 色 */
+  --xuan: #F2EFE7;        /* 宣白：页面底色 */
+  --sheng-xuan: #FAF8F2;  /* 生宣：卡片、浮层 */
+  --mo: #1C1A17;          /* 墨：主文字 */
+  --dan-mo: #6E6A61;      /* 淡墨：次要文字 */
+  --qing-ci: #7D9C8E;     /* 青瓷：唯一功能色 */
+  --zhu-sha: #9A3B32;     /* 朱砂：全页只用一次，落款印 */
+  --hairline: rgba(28, 26, 23, 0.12);
+
+  /* 字距：气质靠字距拉开，不靠字重 */
+  --ls-title: 0.28em;
+  --ls-label: 0.18em;
+
+  background: var(--xuan);
+  color: var(--mo);
+  font-size: 28rpx;
+  line-height: 1.8;
+}

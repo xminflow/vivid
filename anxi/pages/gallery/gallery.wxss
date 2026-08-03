@@ -1,0 +1,25 @@
+/**gallery.wxss**/
+.placeholder {
+  padding: 200rpx 60rpx 0;
+}
+
+.rule {
+  width: 48rpx;
+  height: 2rpx;
+  background: var(--qing-ci);
+  margin-bottom: 32rpx;
+}
+
+.title {
+  display: block;
+  font-size: 40rpx;
+  letter-spacing: var(--ls-label);
+  color: var(--mo);
+}
+
+.desc {
+  display: block;
+  margin-top: 18rpx;
+  font-size: 26rpx;
+  color: var(--dan-mo);
+}

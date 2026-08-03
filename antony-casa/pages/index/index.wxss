@@ -1,0 +1,325 @@
+/* index.wxss 首页 */
+
+.page {
+  min-height: 100vh;
+  background: var(--sfondo);
+}
+
+/* ---------- 上：实拍画廊 ---------- */
+
+.hero {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: var(--nero);
+}
+
+.hero-swiper,
+.hero-image {
+  width: 100%;
+  height: 100%;
+}
+
+.hero-image {
+  display: block;
+}
+
+/* 上下各压一道暗渐变：照片再亮，品牌标和页码也读得清 */
+.veil {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+
+.veil-top {
+  top: 0;
+  background: linear-gradient(180deg, rgba(17, 17, 17, 0.58) 0%, rgba(17, 17, 17, 0) 100%);
+}
+
+/* 品牌陈述整段压在图上，这道渐变要托得住一整块文字 */
+.veil-bottom {
+  bottom: 0;
+  height: 520rpx;
+  background: linear-gradient(0deg, rgba(17, 17, 17, 0.88) 0%, rgba(17, 17, 17, 0.62) 34%, rgba(17, 17, 17, 0.2) 68%, rgba(17, 17, 17, 0) 100%);
+}
+
+.topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding-left: 40rpx;
+  padding-right: 40rpx;
+}
+
+.wordmark {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.16em;
+  color: var(--su-foto);
+  /* 入场：字距从松收到位 */
+  opacity: 0;
+  transition: letter-spacing 800ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 800ms ease;
+}
+
+.wordmark-settled {
+  letter-spacing: 0.06em;
+  opacity: 1;
+}
+
+.topbar-sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  letter-spacing: var(--ls-meta);
+  color: var(--su-foto-debole);
+}
+
+/* 品牌陈述：压在照片下半部分，三档字重把一段话拆出层次 */
+.hero-foot {
+  position: absolute;
+  left: 40rpx;
+  right: 40rpx;
+  bottom: 44rpx;
+}
+
+.statement-heading {
+  display: block;
+  font-size: 38rpx;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: var(--ls-display);
+  color: var(--su-foto);
+}
+
+.statement-body {
+  display: block;
+  margin-top: 14rpx;
+  font-size: 25rpx;
+  line-height: 1.7;
+  letter-spacing: var(--ls-meta);
+  color: var(--su-foto-debole);
+}
+
+.statement-rule {
+  width: 56rpx;
+  height: 2rpx;
+  margin: 26rpx 0 22rpx;
+  background: var(--su-foto);
+}
+
+/* 落款那句，整段的落点，独占一行 */
+.statement-closing {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 500;
+  line-height: 1.55;
+  letter-spacing: var(--ls-display);
+  color: var(--su-foto);
+}
+
+.ticks {
+  display: flex;
+  align-items: center;
+  margin-top: 32rpx;
+}
+
+.tick {
+  width: 14rpx;
+  height: 2rpx;
+  margin-right: 8rpx;
+  background: rgba(255, 255, 255, 0.36);
+  transition: width 360ms ease, background 360ms ease;
+}
+
+.tick-on {
+  width: 40rpx;
+  background: var(--su-foto);
+}
+
+/* ---------- 下：展厅预约 ---------- */
+
+.section {
+  padding: 76rpx 0 88rpx;
+}
+
+/* 区块头：中文粗体，英文小一号压在下面 */
+.head {
+  padding: 0 40rpx;
+}
+
+.head-title {
+  display: block;
+  font-size: 44rpx;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: var(--ls-display);
+  color: var(--nero);
+}
+
+.head-en {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 26rpx;
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}
+
+/* 内嵌画廊：一屏一间，滑到底才换页，右边不留下一张的边 */
+/* 页码要浮在整个 swiper 之上、又不跟着某一张卡片滑走，所以外面套一层做定位参照 */
+.gallery-wrap {
+  position: relative;
+  margin-top: 40rpx;
+}
+
+.gallery {
+  width: 100%;
+  /* swiper 必须给死高度：图 780 + 信息条 180 */
+  height: 960rpx;
+}
+
+.card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 0 40rpx;
+  background: transparent;
+}
+
+.card-image {
+  display: block;
+  width: 100%;
+  height: 780rpx;
+  background: var(--sfondo);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+/* 压在图片下沿的渐变：照片有亮有暗，白色页码要始终读得出来。
+   左右各让开 40rpx，跟图片边线对齐，不糊到卡片外面 */
+.card-veil {
+  position: absolute;
+  left: 40rpx;
+  right: 40rpx;
+  top: 620rpx;
+  height: 160rpx;
+  background: linear-gradient(0deg, rgba(17, 17, 17, 0.5) 0%, rgba(17, 17, 17, 0) 100%);
+  pointer-events: none;
+}
+
+/* 压在图片下沿居中。图片左右留白对称，所以拉满整宽居中即可。
+   bottom 从 swiper 底往上量：信息条 180 + 离图片下沿 28 */
+.gallery-ticks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 208rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 别挡住滑动手势 */
+  pointer-events: none;
+}
+
+.gtick {
+  width: 14rpx;
+  height: 2rpx;
+  margin-right: 8rpx;
+  background: rgba(255, 255, 255, 0.4);
+  transition: width 360ms ease, background 360ms ease;
+}
+
+/* 最后一根的右边距要去掉，否则整排的视觉中心会偏左 4rpx */
+.gtick:last-child {
+  margin-right: 0;
+}
+
+.gtick-on {
+  width: 40rpx;
+  background: var(--su-foto);
+}
+
+/* 信息条：左边序号、名称与可约信息，右边一道竖线隔开「立即预约」 */
+.card-bar {
+  display: flex;
+  align-items: center;
+  padding: 28rpx 32rpx 30rpx;
+}
+
+.card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-nameline {
+  display: flex;
+  align-items: baseline;
+}
+
+.card-ordinal {
+  flex: none;
+  margin-right: 16rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}
+
+.card-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 30rpx;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-meta {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+}
+
+.card-cta {
+  flex: none;
+  margin-left: 28rpx;
+  padding-left: 28rpx;
+  border-left: 1rpx solid var(--hairline);
+}
+
+.card-cta-hover {
+  opacity: 0.45;
+}
+
+.card-cta-line {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0.06em;
+  color: var(--nero);
+}
+
+/* ---------- 活动预告 ---------- */
+
+/* 海报整张铺满，widthFix 按原图比例定高，不裁不压。
+   左右留白跟展厅卡片对齐，两块的边线在一条竖线上 */
+.poster {
+  display: block;
+  width: calc(100% - 80rpx);
+  margin: 40rpx 40rpx 0;
+  border-radius: var(--radius);
+  background: var(--sfondo);
+}
