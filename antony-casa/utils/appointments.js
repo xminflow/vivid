@@ -1,9 +1,12 @@
-// 本机的预约记录。
+// 我的预约记录。
 //
-// 服务端的 GET /api/appointments 是后台用的全量列表，没有按用户隔离，
-// 前端不能直接拿来当「我的预约」——那会把别人的姓名电话露给所有人。
-// 等 app.js 里的 wx.login 换到 openId、服务端补上按 openId 过滤的接口之后，
-// 把 list() 换成请求即可，页面不用动。
+// 服务端的 GET /api/appointments 是后台用的全量列表，前端不能碰——那会把别人的
+// 姓名电话露给所有人。这里走 /api/users/me/appointments，服务端按 token 认出是谁，
+// 只返回他自己的。
+//
+// 本机那份是兜底：没网、或者提交时还没拿到登录态的记录，至少用户自己看得见。
+
+const api = require('./api.js')
 
 const KEY = 'myAppointments'
 const MAX = 20
@@ -28,4 +31,15 @@ function save(record) {
   }
 }
 
-module.exports = { list, save }
+// 服务端那份。失败就退回本机的，页面不用分辨来源
+function fetchMine() {
+  return api
+    .request({ url: '/api/users/me/appointments' })
+    .then(res => {
+      if (res.statusCode !== 200 || !res.data.ok) throw new Error(res.data.message || '')
+      return res.data.items
+    })
+    .catch(() => null)
+}
+
+module.exports = { list, save, fetchMine }

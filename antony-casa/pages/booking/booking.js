@@ -1,5 +1,5 @@
 // 预约参观登记表。选项值必须与 server/schema.sql 里的 CHECK 约束一致。
-const { API_BASE } = require('../../utils/config.js')
+const api = require('../../utils/api.js')
 const appointments = require('../../utils/appointments.js')
 
 const VISITOR_TYPES = ['C端业主', '设计师', '地产开发商', '酒店民宿业主', '家居行业经销商', '艺术家']
@@ -115,20 +115,20 @@ Page({
     this.setData({ submitting: true })
     wx.showLoading({ title: '提交中', mask: true })
 
-    wx.request({
-      url: `${API_BASE}/api/appointments`,
-      method: 'POST',
-      header: { 'Content-Type': 'application/json' },
-      data: payload,
-      success: res => {
+    // 带上登录态，服务端就能认出是谁提交的，「我的」页才拉得到这条；
+    // 登录出问题也不挡着提交——这张表未登录同样收
+    api
+      .requestOptionalAuth({ url: '/api/appointments', method: 'POST', data: payload })
+      .then(res => {
         if (res.statusCode === 201 && res.data && res.data.ok) {
-          // 存一份到本机，「我的」页要按 openId 拉记录得等后端，先让用户看得见自己刚提交的
+          // 本机也存一份：万一这次没登录态，至少用户自己看得见刚提交的
           appointments.save({
             visitDate: payload.visitDate,
             partySize: payload.partySize,
             purpose: payload.purpose,
             visitorType: payload.visitorType,
-            spaceName: this.data.spaceName
+            spaceName: this.data.spaceName,
+            status: 'new'
           })
 
           wx.showModal({
@@ -142,14 +142,17 @@ Page({
           const message = (res.data && res.data.message) || '提交失败，请稍后再试'
           wx.showToast({ title: message, icon: 'none', duration: 2600 })
         }
-      },
-      fail: () => {
-        wx.showToast({ title: '网络异常，请检查后重试', icon: 'none', duration: 2600 })
-      },
-      complete: () => {
+      })
+      .catch(err => {
+        wx.showToast({
+          title: (err && err.message) || '网络异常，请检查后重试',
+          icon: 'none',
+          duration: 2600
+        })
+      })
+      .then(() => {
         wx.hideLoading()
         this.setData({ submitting: false })
-      }
-    })
+      })
   }
 })

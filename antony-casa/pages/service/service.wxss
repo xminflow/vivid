@@ -108,7 +108,7 @@
   color: var(--nero);
 }
 
-/* 整段介绍在申请页，这里只露三行 */
+/* 整段介绍在申请页，这里只露两行，卡片才不会被大段文字压住 */
 .intro {
   display: -webkit-box;
   margin-top: 14rpx;
@@ -118,7 +118,7 @@
   color: var(--grigio);
   overflow: hidden;
   text-overflow: ellipsis;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
 

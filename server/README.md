@@ -141,8 +141,7 @@ uv run pytest -v
 - 换成备案的 https 域名，在小程序后台配 request 合法域名（改 `antony-casa/utils/config.js` 的 `API_BASE`）
 - **给 `GET /api/appointments` 加鉴权**——现在是裸奔的，任何人都能拉走全部客户姓名和手机号
 - CORS 从 `*` 收窄到具体域名
-- 小程序侧接上 `wx.login`：`utils/profile.js` 现在还是写本机 storage，要换成调
-  `/api/users/me`（服务端这条链路已经通了）
 - 生产环境的 `WORKER_ID` 按机器分配，别几台都用默认的 0
+- `.env` 里的 `WX_SECRET` 换成生产小程序的；secret 一旦外泄要去后台重置
 - 换一套生产库账号：`app_dev` 是开发账号，不该用于线上
 - 云库如果开了 IP 白名单，部署机器的出口 IP 要加进去

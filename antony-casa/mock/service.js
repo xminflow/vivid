@@ -14,10 +14,10 @@
 //    没有联系方式运营没法跟进，所以这三个也补了「客户名称 + 联系方式」，
 //    并且和前两个一样从「我的信息」自动带入。不需要的话删掉对应两行即可。
 //
-// 📷 image 现在都是空串：项目里 11 张实拍首页已经全部用掉，没有没露过面的图，
-//    从外面找版权不明的素材放进商用小程序有风险。留空时服务卡走纯文字的深色卡头，
-//    是一种设计，不是缺图的兜底。拿到该服务的实拍后，把图丢进 assets/service/
-//    再把路径填回这一行，卡头会自动切回照片版，页面代码不用动。
+// 📷 image 用的是 assets/home/ 里的素材，跟首页画廊是同一批（首页 11 张已全部占用，
+//    项目里没有没露过面的图）。这批本身也是开业前的占位素材，上线前要换成安东尼之家
+//    自己的实拍。换法：图丢进 assets/service/，改这一行的路径即可，页面代码不用动。
+//    留空则该卡自动退回纯文字的深色卡头，不会出裂图。
 
 const CONTACT_FIELDS = [
   { id: 'name', label: '客户名称', type: 'text', required: true, placeholder: '怎么称呼您', maxlength: 40 },
@@ -30,7 +30,7 @@ const services = [
   {
     id: 'design',
     ordinal: '01',
-    image: '',
+    image: '/assets/home/space-03.jpg',
     name: '全案设计服务',
     tagline: '为您的空间注入新的想象',
     intro:
@@ -55,7 +55,7 @@ const services = [
   {
     id: 'hardfit',
     ordinal: '02',
-    image: '',
+    image: '/assets/home/space-04.jpg',
     name: '硬装施工服务',
     tagline: '为您提供装修落地服务',
     intro:
@@ -80,7 +80,7 @@ const services = [
   {
     id: 'buyer',
     ordinal: '03',
-    image: '',
+    image: '/assets/home/space-06.jpg',
     name: '商品买手服务',
     tagline: '满足您的个性化需求',
     intro:
@@ -103,7 +103,7 @@ const services = [
   {
     id: 'aftersale',
     ordinal: '04',
-    image: '',
+    image: '/assets/home/space-01.jpg',
     name: '商品售后服务',
     tagline: '始于精挑细选，终于无忧售后',
     intro:
@@ -128,7 +128,7 @@ const services = [
   {
     id: 'resale',
     ordinal: '05',
-    image: '',
+    image: '/assets/home/hero-01.jpg',
     name: '商品流转服务',
     tagline: '让好物续遇知音',
     intro:

@@ -1,38 +1,137 @@
 /* mine.wxss 我的 */
 
-/* 页内不再有大标题，标题只在导航栏。
-   这 8rpx 是为了挡住 .block 的 margin-top 外溢（外边距会穿透没有 padding 的父级），
-   加上第一块自己的 48rpx，首块离顶 56rpx，跟原来页头的留白一致 */
 .page {
   min-height: 100vh;
-  padding-top: 8rpx;
-  padding-bottom: 60rpx;
+  padding: 72rpx 0 60rpx;
   background: var(--sfondo);
 }
 
-/* ---------- 分块 ---------- */
+/* ---------- 顶部身份 ---------- */
 
-.block {
-  margin-top: 48rpx;
-}
-
-.block-head {
+.me {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 0 40rpx 20rpx;
+  align-items: center;
+  padding: 0 48rpx 72rpx;
 }
 
-.block-title {
-  font-size: 28rpx;
+.me-hover {
+  opacity: 0.6;
+}
+
+/* 没有头像素材，用会员名首字顶上。没填名字时留一个空的描边圆 */
+.me-avatar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 104rpx;
+  height: 104rpx;
+  margin-right: 26rpx;
+  background: var(--nero);
+  border-radius: 50%;
+}
+
+.me-avatar-empty {
+  background: transparent;
+  border: 1rpx solid var(--hairline);
+}
+
+.me-initial {
+  font-size: 38rpx;
   font-weight: 600;
+  line-height: 1;
+  color: var(--bianco);
+}
+
+.me-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.me-name {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: var(--ls-display);
+  color: var(--nero);
+}
+
+/* 还没填的时候是个引导，不该看着像已经填好的名字 */
+.me-name-empty {
+  font-weight: 400;
+  color: var(--grigio-chiaro);
+}
+
+.me-sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+}
+
+.me-mark {
+  flex: none;
+  margin-left: 20rpx;
+  font-size: 30rpx;
+  line-height: 1;
+  color: var(--grigio-chiaro);
+  transition: transform 220ms ease;
+}
+
+/* ---------- 折叠段 ---------- */
+/* 收起时整页只剩四行标题加四道细线，留白给足，一眼看完有哪些东西 */
+
+.sec {
+  padding: 0 48rpx;
+}
+
+.sec + .sec {
+  margin-top: 88rpx;
+}
+
+.sec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 26rpx;
+  border-bottom: 1rpx solid var(--hairline);
+}
+
+.sec-head-hover {
+  opacity: 0.5;
+}
+
+.sec-title {
+  font-size: 30rpx;
+  font-weight: 500;
   line-height: 1.5;
   letter-spacing: var(--ls-meta);
   color: var(--nero);
 }
 
+/* 收起指右，展开转成指下。没有这个记号，四行标题看着像四个死标签 */
+.sec-mark {
+  flex: none;
+  margin-left: 20rpx;
+  font-size: 30rpx;
+  line-height: 1;
+  color: var(--grigio-chiaro);
+  transition: transform 220ms ease;
+}
+
+.sec-mark-on {
+  transform: rotate(90deg);
+}
+
+.sec-body {
+  padding-top: 28rpx;
+}
+
+/* 左右留白由 .sec 统一给，卡片自己不再留边，边线才跟标题对齐 */
 .card {
-  margin: 0 40rpx;
   background: var(--bianco);
   border-radius: var(--radius);
   overflow: hidden;
@@ -281,7 +380,7 @@
 /* ---------- 落款 ---------- */
 
 .foot {
-  padding: 72rpx 40rpx 0;
+  padding: 120rpx 48rpx 0;
   text-align: center;
 }
 
