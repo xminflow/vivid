@@ -1,17 +1,8 @@
 <!--service.wxml 五个服务，每个可单独申请-->
 <view class="page">
 
-  <view class="hd">
-    <text class="hd-title">服务</text>
-    <text class="hd-en">Services</text>
-  </view>
-
-  <view class="intro">
-    <text class="intro-heading">{{intro.heading}}</text>
-    <text class="intro-body">{{intro.body}}</text>
-  </view>
-
-  <!-- 卡片上只放摘要，整段介绍在申请页里，避免这页变成一堵字墙 -->
+  <!-- 一服务一张图。序号和服务名压在照片上，说明落在下面的白底里；
+       介绍原文很长，这里只露三行，整段在申请页 -->
   <view
     class="item"
     wx:for="{{services}}"
@@ -21,24 +12,37 @@
     data-id="{{item.id}}"
     bindtap="onApply"
   >
-    <view class="item-head">
-      <text class="item-ordinal">{{item.ordinal}}</text>
-      <view class="item-title">
-        <text class="item-name">{{item.name}}</text>
-        <text class="item-tagline">{{item.tagline}}</text>
+    <!-- 有实拍走照片版，没有就走深色版：两版共用同一套标题排布，
+         mock 里把 image 填回去即可切换，页面不用改 -->
+    <view class="shot" wx:if="{{item.image}}">
+      <image class="shot-image" src="{{item.image}}" mode="aspectFill" lazy-load />
+      <view class="shot-veil"></view>
+      <view class="shot-title">
+        <text class="shot-ordinal">{{item.ordinal}}</text>
+        <text class="shot-name">{{item.name}}</text>
       </view>
     </view>
 
-    <text class="item-intro">{{item.intro}}</text>
+    <view class="shot shot-plain" wx:else>
+      <text class="ghost">{{item.ordinal}}</text>
+      <view class="shot-title">
+        <text class="shot-ordinal">{{item.ordinal}}</text>
+        <text class="shot-name">{{item.name}}</text>
+      </view>
+    </view>
 
-    <view class="item-foot">
-      <text class="item-note" wx:if="{{item.note}}">注 · {{item.note}}</text>
-      <text class="item-note" wx:else></text>
-      <text class="item-cta">立即申请 ›</text>
+    <view class="body">
+      <text class="tagline">{{item.tagline}}</text>
+      <text class="intro">{{item.intro}}</text>
+
+      <view class="foot">
+        <text class="note">{{item.note ? '注 · ' + item.note : ''}}</text>
+        <text class="cta">立即申请 ›</text>
+      </view>
     </view>
   </view>
 
-  <view class="foot">
+  <view class="tail">
     <button class="contact" open-type="contact" hover-class="none">
       <text class="contact-text">拿不准选哪项？在线咨询客服</text>
     </button>

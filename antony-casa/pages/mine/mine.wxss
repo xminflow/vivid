@@ -1,33 +1,13 @@
 /* mine.wxss 我的 */
 
+/* 页内不再有大标题，标题只在导航栏。
+   这 8rpx 是为了挡住 .block 的 margin-top 外溢（外边距会穿透没有 padding 的父级），
+   加上第一块自己的 48rpx，首块离顶 56rpx，跟原来页头的留白一致 */
 .page {
   min-height: 100vh;
+  padding-top: 8rpx;
   padding-bottom: 60rpx;
   background: var(--sfondo);
-}
-
-/* ---------- 页头 ---------- */
-
-.hd {
-  padding: 56rpx 40rpx 0;
-}
-
-.hd-title {
-  display: block;
-  font-size: 44rpx;
-  font-weight: 600;
-  line-height: 1.25;
-  letter-spacing: var(--ls-display);
-  color: var(--nero);
-}
-
-.hd-en {
-  display: block;
-  margin-top: 4rpx;
-  font-size: 26rpx;
-  line-height: 1.4;
-  letter-spacing: var(--ls-meta);
-  color: var(--grigio-chiaro);
 }
 
 /* ---------- 分块 ---------- */

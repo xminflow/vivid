@@ -1,11 +1,6 @@
 <!--mine.wxml 我的：资料 / 顾问 / 服务 / 预约-->
 <view class="page">
 
-  <view class="hd">
-    <text class="hd-title">我的</text>
-    <text class="hd-en">Mine</text>
-  </view>
-
   <!-- ========== 我的信息 ========== -->
   <view class="block">
     <view class="block-head">

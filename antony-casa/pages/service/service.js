@@ -1,9 +1,8 @@
 // 服务：五个服务各自成卡，点进去是该服务的申请表单
-const { intro, services } = require('../../mock/service.js')
+const { services } = require('../../mock/service.js')
 
 Page({
   data: {
-    intro,
     services
   },
 
