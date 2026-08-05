@@ -36,8 +36,7 @@ uv run python scripts/upload_static.py     # 传到 COS 的 static/service/ 并�
 `image` 留空即可——服务页会自动走深色纯文字卡头（`service.wxml` 里的 `shot-plain`），
 不会出裂图。
 
-当前进度：`design` / `hardfit` 已是自己的图；`buyer` / `aftersale` / `resale` 还在借首页
-画廊的图，跟首页重复，实拍到位后按上表补齐同名文件再跑一次脚本即可。
+当前五个服务都用的是本目录下自己的图，跟首页画廊不再重复。
 
 ## 关于格式
 

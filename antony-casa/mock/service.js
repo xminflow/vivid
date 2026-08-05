@@ -14,9 +14,9 @@
 //    没有联系方式运营没法跟进，所以这三个也补了「客户名称 + 联系方式」，
 //    并且和前两个一样从「我的信息」自动带入。不需要的话删掉对应两行即可。
 //
-// 📷 图存在 COS 上不进包，见 utils/config.js 的 STATIC_BASE。
-//    前两个服务用的是 static/service/ 下自己的图；后三个还在借首页画廊的 static/home/，
-//    跟首页重复，等实拍到位后按 assets/service/README.md 补齐同名文件即可替换。
+// 📷 图存在 COS 上不进包，见 utils/config.js 的 STATIC_BASE。文件名与服务 id 同名，
+//    换图就是替换 assets/service/<id>.jpg 后跑一次 server/scripts/upload_static.py，
+//    小程序不用发版。规格见 assets/service/README.md。
 //    留空则该卡自动退回纯文字的深色卡头，不会出裂图。
 
 const { STATIC_BASE } = require('../utils/config.js')
@@ -82,7 +82,7 @@ const services = [
   {
     id: 'buyer',
     ordinal: '03',
-    image: `${STATIC_BASE}/home/space-06.jpg`,
+    image: `${STATIC_BASE}/service/buyer.jpg`,
     name: '商品买手服务',
     tagline: '满足您的个性化需求',
     intro:
@@ -105,7 +105,7 @@ const services = [
   {
     id: 'aftersale',
     ordinal: '04',
-    image: `${STATIC_BASE}/home/space-01.jpg`,
+    image: `${STATIC_BASE}/service/aftersale.jpg`,
     name: '商品售后服务',
     tagline: '始于精挑细选，终于无忧售后',
     intro:
@@ -130,7 +130,7 @@ const services = [
   {
     id: 'resale',
     ordinal: '05',
-    image: `${STATIC_BASE}/home/hero-01.jpg`,
+    image: `${STATIC_BASE}/service/resale.jpg`,
     name: '商品流转服务',
     tagline: '让好物续遇知音',
     intro:
