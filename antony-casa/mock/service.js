@@ -14,9 +14,9 @@
 //    没有联系方式运营没法跟进，所以这三个也补了「客户名称 + 联系方式」，
 //    并且和前两个一样从「我的信息」自动带入。不需要的话删掉对应两行即可。
 //
-// 📷 image 用的是 static/home/ 里的素材，跟首页画廊是同一批（首页 11 张已全部占用，
-//    项目里没有没露过面的图）。图存在 COS 上不进包，见 utils/config.js 的 STATIC_BASE。
-//    这批本身也是开业前的占位素材，上线前要换成安东尼之家自己的实拍。
+// 📷 图存在 COS 上不进包，见 utils/config.js 的 STATIC_BASE。
+//    前两个服务用的是 static/service/ 下自己的图；后三个还在借首页画廊的 static/home/，
+//    跟首页重复，等实拍到位后按 assets/service/README.md 补齐同名文件即可替换。
 //    留空则该卡自动退回纯文字的深色卡头，不会出裂图。
 
 const { STATIC_BASE } = require('../utils/config.js')
@@ -32,7 +32,7 @@ const services = [
   {
     id: 'design',
     ordinal: '01',
-    image: `${STATIC_BASE}/home/space-03.jpg`,
+    image: `${STATIC_BASE}/service/design.jpg`,
     name: '全案设计服务',
     tagline: '为您的空间注入新的想象',
     intro:
@@ -57,7 +57,7 @@ const services = [
   {
     id: 'hardfit',
     ordinal: '02',
-    image: `${STATIC_BASE}/home/space-04.jpg`,
+    image: `${STATIC_BASE}/service/hardfit.jpg`,
     name: '硬装施工服务',
     tagline: '为您提供装修落地服务',
     intro:

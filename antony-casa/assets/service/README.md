@@ -34,4 +34,13 @@ uv run python scripts/upload_static.py     # 传到 COS 的 static/service/ 并�
 ## 没图的时候
 
 `image` 留空即可——服务页会自动走深色纯文字卡头（`service.wxml` 里的 `shot-plain`），
-不会出裂图。当前用的是首页画廊的图，跟首页重复，有实拍后应尽快换掉。
+不会出裂图。
+
+当前进度：`design` / `hardfit` 已是自己的图；`buyer` / `aftersale` / `resale` 还在借首页
+画廊的图，跟首页重复，实拍到位后按上表补齐同名文件再跑一次脚本即可。
+
+## 关于格式
+
+照片类图**不要用 PNG**。PNG 是无损格式，同一张实拍存成 PNG 往往是 JPEG 的十几倍
+（design 原图 PNG 2.1MB，转 JPEG q85 后 199KB，肉眼无差别）。手头只有 PNG 时不用自己转，
+丢进来说一声即可——Windows 自带的 .NET System.Drawing 就能转，不需要装任何图像工具。
