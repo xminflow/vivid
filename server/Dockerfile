@@ -42,8 +42,7 @@ COPY --chown=app:app app ./app
 USER app
 
 # 容器内监听端口，HEALTHCHECK 和 CMD 都读它，运行时可用 -e PORT 覆盖。
-# 本地开发（README 里直接跑 uvicorn）仍是 3001，两者不必一致：
-# 宿主机怎么映射由 -p 决定，小程序 utils/config.js 的 API_BASE 跟宿主机端口走
+# 与 README 的本地启动命令、小程序 utils/config.js 的 API_BASE 统一为 3000
 ENV PORT=3000
 EXPOSE 3000
 

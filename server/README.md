@@ -26,12 +26,15 @@ cp .env.example .env
 # 在 WSL 中
 cd /mnt/d/code/vivid/server
 uv sync
-uv run uvicorn app.main:app --host 0.0.0.0 --port 3001
+uv run uvicorn app.main:app --host 0.0.0.0 --port 3000
 ```
 
 开发时加 `--reload` 改代码自动重启。
 
-Windows 侧（微信开发者工具所在环境）直接访问 `http://127.0.0.1:3001`，WSL2 会自动转发。
+Windows 侧（微信开发者工具所在环境）直接访问 `http://127.0.0.1:3000`，WSL2 会自动转发。
+
+端口 3000 是全链路统一的：本地 uvicorn、容器内监听（`Dockerfile` 的 `PORT`）、
+小程序 `utils/config.js` 的 `API_BASE` 都用它，容器部署时宿主机也映射成 `-p 3000:3000`。
 
 ## 建表
 
