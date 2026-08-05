@@ -14,8 +14,9 @@ from datetime import datetime, timedelta, timezone
 import psycopg
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 
+from . import cos
 from .db import pool
-from .models import LoginIn, ProfileIn
+from .models import AvatarIn, LoginIn, ProfileIn
 from .snowflake import next_id
 from .wechat import WeChatError, code2session
 
@@ -26,9 +27,22 @@ TOKEN_TTL = timedelta(days=30)
 
 # 出接口的字段。session_key、token 是密钥，openid 前端也用不上，都不在这里
 USER_COLUMNS = """
-    id, nickname, avatar_url, member_name, phone, email, birthday, gender,
+    id, nickname, avatar_url, avatar_key, member_name, phone, email, birthday, gender,
     province, city, district, is_member, member_expires_at, status, created_at
 """
+
+
+def avatar_url(row: dict) -> str:
+    """头像出接口是一个带签名的临时地址。
+
+    库里存的是 COS 对象键，键本身给客户端没用；桶和地域将来会变，也不能存死 URL。
+    用户没设过头像时 avatar_key 是空串，回落到微信授权时给的外链（通常也是空），
+    客户端拿到空串就显示会员名首字。
+    """
+    key = row["avatar_key"]
+    if key and cos.configured():
+        return cos.presign_get(key, cos.AVATAR_EXPIRE_SECONDS)
+    return row["avatar_url"]
 
 
 def to_json(row: dict) -> dict:
@@ -41,7 +55,7 @@ def to_json(row: dict) -> dict:
     return {
         "id": str(row["id"]),
         "nickname": row["nickname"],
-        "avatarUrl": row["avatar_url"],
+        "avatarUrl": avatar_url(row),
         "memberName": row["member_name"],
         "phone": row["phone"],
         "email": row["email"],
@@ -228,4 +242,32 @@ async def update_me(profile: ProfileIn, user: dict = Depends(current_user)) -> d
         print(f"[profile update failed] {exc}")
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "保存失败，请稍后再试") from exc
 
+    return {"ok": True, "user": to_json(row)}
+
+
+@router.put("/api/users/me/avatar")
+async def update_avatar(body: AvatarIn, user: dict = Depends(current_user)) -> dict:
+    """换头像。单独一个接口，不并进 PUT /api/users/me：
+
+    「我的信息」是改一个字段就整份覆盖提交、还带防抖，头像混进去会被反复重传，
+    表单里任一字段校验不过也会连头像一起保存失败。两者触发时机和失败语义都不同。
+    """
+    try:
+        async with pool.connection() as conn:
+            row = await (
+                await conn.execute(
+                    f"""
+                    UPDATE users SET avatar_key = %s WHERE id = %s
+                    RETURNING {USER_COLUMNS}
+                    """,
+                    (body.avatar_key, user["id"]),
+                )
+            ).fetchone()
+    except psycopg.Error as exc:
+        print(f"[avatar update failed] user_id={user['id']} {exc}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "头像保存失败，请稍后再试") from exc
+
+    # 旧头像的对象没有删，留在桶里。删除要处理「删到一半失败」和「回滚后旧图已没了」，
+    # 本期先不做，靠后续的桶生命周期规则清理孤儿对象
+    print(f"[avatar updated] user_id={user['id']} key={body.avatar_key}")
     return {"ok": True, "user": to_json(row)}

@@ -59,6 +59,30 @@ class LoginIn(BaseModel):
     avatar_url: Trimmed = ""
 
 
+def check_upload_key(key: str) -> str:
+    """只收本服务端签发过的对象键。
+
+    客户端传来的是键不是 URL，若不校验，任何人都能把任意字符串写进库，
+    之后按键签出的地址就会指向桶里别的对象。
+    """
+    if not key.startswith("uploads/") or ".." in key:
+        raise ValueError("图片标识不合法")
+    return key
+
+
+class AvatarIn(BaseModel):
+    """换头像。传的是 /api/upload-url 签发、客户端直传完成的 COS 对象键。"""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    avatar_key: Annotated[Trimmed, Field(min_length=1, max_length=200)]
+
+    @field_validator("avatar_key")
+    @classmethod
+    def key_is_one_of_ours(cls, v: str) -> str:
+        return check_upload_key(v)
+
+
 class ProfileIn(BaseModel):
     """「我的信息」整份提交，字段都可以留空——用户填一半就退出是常态。"""
 
@@ -157,17 +181,11 @@ class ServiceApplicationIn(BaseModel):
     @field_validator("images")
     @classmethod
     def keys_look_like_ours(cls, v: dict[str, list[str]]) -> dict[str, list[str]]:
-        """只收本服务端签发过的对象键。
-
-        客户端传来的是键不是 URL，若不校验，任何人都能把任意字符串写进库，
-        后台按键签出的地址就会指向桶里别的对象。
-        """
         total = sum(len(keys) for keys in v.values())
         if total > MAX_IMAGES:
             raise ValueError(f"图片最多 {MAX_IMAGES} 张")
 
         for keys in v.values():
             for key in keys:
-                if not key.startswith("uploads/") or ".." in key:
-                    raise ValueError("图片标识不合法")
+                check_upload_key(key)
         return v

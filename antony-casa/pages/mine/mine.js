@@ -1,6 +1,7 @@
 // 我的：会员资料 / 专属顾问 / 服务 / 预约
 const profileStore = require('../../utils/profile.js')
 const appointments = require('../../utils/appointments.js')
+const { uploadImage } = require('../../utils/upload.js')
 const { advisor, genders } = require('../../mock/mine.js')
 const { brand, spaces } = require('../../mock/home.js')
 
@@ -60,6 +61,10 @@ Page({
     regionText: '',
     initial: '',
     phoneMasked: '',
+    // 头像地址是有时效的，拉不出来时先退回首字，见 onAvatarError
+    avatarBroken: false,
+    // 图真加载出来了才让它显形，否则真机会先闪一帧系统裂图
+    avatarReady: false,
     birthdayStart: BIRTHDAY_START,
     today: todayStr(),
     records: [],
@@ -100,12 +105,19 @@ Page({
   },
 
   renderProfile(profile) {
-    this.setData({
+    const patch = {
       profile,
       regionText: formatRegion(profile.region),
       initial: initialOf(profile.memberName),
       phoneMasked: maskPhone(profile.phone)
-    })
+    }
+    // 换了地址才给它一次新机会。地址没变就别重置：这个方法每敲一个字都会走一次，
+    // 否则会反复去重拉那张已经拉不出来的图
+    if (profile.avatarUrl !== this.data.profile.avatarUrl) {
+      patch.avatarBroken = false
+      patch.avatarReady = false
+    }
+    this.setData(patch)
   },
 
   renderRecords(rows) {
@@ -118,6 +130,51 @@ Page({
       }))
     })
   },
+
+  // ---------- 头像 ----------
+
+  // 微信在 2022-10-25 之后收回了 getUserProfile 的头像昵称，现在只剩 chooseAvatar
+  // 这一条路：用户点一下，由微信弹窗让他选微信头像或自己的图片。
+  // 拿到的是本机临时路径（wxfile://），小程序一重启就失效，必须立刻传到 COS，
+  // 库里存对象键，显示用的地址由服务端现签。
+  async onChooseAvatar(e) {
+    const tempPath = e.detail.avatarUrl
+    if (!tempPath) return
+
+    const previous = this.data.profile.avatarUrl
+
+    // 先把临时图顶上去，点完立刻看到换了，不用等网络
+    this.setData({ 'profile.avatarUrl': tempPath, avatarBroken: false, avatarReady: false })
+    wx.showLoading({ title: '保存中', mask: true })
+
+    try {
+      const key = await uploadImage(tempPath, 'avatar')
+      const saved = await profileStore.saveAvatar(key)
+      // 换成服务端签的正式地址：临时路径下次进页面就没了
+      this.renderProfile({ ...this.data.profile, avatarUrl: saved.avatarUrl })
+    } catch (err) {
+      // 没存上就退回原来那张。留着临时图会让用户以为已经换好了，下次进来又变回去
+      this.setData({ 'profile.avatarUrl': previous, avatarReady: false })
+      profileStore.cacheAvatar(previous)
+      wx.showToast({ title: err.message || '头像保存失败', icon: 'none', duration: 2400 })
+    } finally {
+      wx.hideLoading()
+    }
+  },
+
+  // 头像地址是服务端签的临时地址，本机快照里那份放到下次冷启动可能已经过期。
+  // 拉不出来就先退回首字，onShow 里的 fetch 会带回新地址
+  onAvatarError() {
+    this.setData({ avatarBroken: true, avatarReady: false })
+  },
+
+  // 图确实解出来了才盖到首字圆上面去
+  onAvatarLoad() {
+    this.setData({ avatarReady: true })
+  },
+
+  // 头像 button 上的 catchtap 要挂个方法，只为拦冒泡，本身不做事
+  noop() {},
 
   // ---------- 折叠 ----------
 

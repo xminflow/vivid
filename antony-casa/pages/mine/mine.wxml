@@ -9,8 +9,35 @@
     data-k="info"
     bindtap="onToggleSection"
   >
-    <view class="me-avatar {{initial ? '' : 'me-avatar-empty'}}">
-      <text class="me-initial">{{initial}}</text>
+    <!-- 头像做成 button 是为了 open-type="chooseAvatar"：微信只认这个能力，
+         点一下由微信弹「使用微信头像 / 从相册选 / 拍照」。
+         catchtap 拦住冒泡，否则点头像会连带把下面的「我的信息」展开 -->
+    <!-- 外面这层 view 才是定尺寸和居中的人：button 的盒子由微信基础样式控制，
+         直接给它 width 会被撑成整行，圆就贴到左边去了 -->
+    <view class="me-avatar-wrap">
+      <button
+        class="me-avatar-btn"
+        open-type="chooseAvatar"
+        bind:chooseavatar="onChooseAvatar"
+        catchtap="noop"
+        hover-class="me-avatar-hover"
+        hover-stay-time="120"
+      >
+        <!-- 首字圆一直垫在底下，头像图盖在上面且要等 bindload 成功才显形。
+             缓存里可能是上次会话留下的临时路径或过期签名地址，真机加载失败会先
+             画出系统裂图，binderror 是失败之后才来的，挡不住那一帧 -->
+        <view class="me-avatar {{initial ? '' : 'me-avatar-empty'}}">
+          <text class="me-initial">{{initial}}</text>
+        </view>
+        <image
+          wx:if="{{profile.avatarUrl && !avatarBroken}}"
+          class="me-avatar-img {{avatarReady ? 'me-avatar-img-on' : ''}}"
+          src="{{profile.avatarUrl}}"
+          mode="aspectFill"
+          bindload="onAvatarLoad"
+          binderror="onAvatarError"
+        />
+      </button>
     </view>
 
     <view class="me-text">

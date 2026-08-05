@@ -30,6 +30,10 @@ REGION = os.getenv("COS_REGION", "ap-shanghai")
 PUT_EXPIRE_SECONDS = 15 * 60
 GET_EXPIRE_SECONDS = 60 * 60
 
+# 头像地址签得比后台看图长得多：小程序把资料快照存在本机，下次冷启动先用快照渲染，
+# 签一小时的话隔天进来第一眼就是一张拉不出来的图
+AVATAR_EXPIRE_SECONDS = 7 * 24 * 60 * 60
+
 # 只收这几种图片。扩展名是白名单，不是从用户传的文件名里直接拼的
 ALLOWED_EXTS = {"jpg", "jpeg", "png", "webp", "heic"}
 
@@ -112,9 +116,14 @@ def presign_put(key: str) -> str:
     return f"{object_url(key)}?{_sign('put', key, PUT_EXPIRE_SECONDS)}"
 
 
-def presign_get(key: str) -> str:
-    """桶是私有的，后台看图要带签名的临时地址。"""
-    return f"{object_url(key)}?{_sign('get', key, GET_EXPIRE_SECONDS)}"
+def presign_get(key: str, expire_seconds: int = GET_EXPIRE_SECONDS) -> str:
+    """看图用带签名的临时地址。
+
+    注意：当前这个开发桶的权限实际是「公有读私有写」（对象拿 URL 就能直接下，
+    只是不能列举），签名在读这一侧其实没有拦截作用。这里仍然一律签名，
+    是为了桶权限收紧成私有读之后不用再改代码——见 README「上线前要做的」。
+    """
+    return f"{object_url(key)}?{_sign('get', key, expire_seconds)}"
 
 
 def presign_delete(key: str) -> str:

@@ -8,25 +8,72 @@
 
 /* ---------- 顶部身份 ---------- */
 
+/* 上下排布。居中不靠 flex 的 align-items：头像用 margin auto、文字用 text-align，
+   这两条在块级布局下同样成立，换渲染器也不会散架 */
 .me {
-  display: flex;
-  align-items: center;
+  display: block;
   padding: 0 48rpx 72rpx;
+  text-align: center;
 }
 
 .me-hover {
   opacity: 0.6;
 }
 
-/* 没有头像素材，用会员名首字顶上。没填名字时留一个空的描边圆 */
+/* 尺寸和居中都放在这层普通 view 上，不受 button 基础样式影响 */
+.me-avatar-wrap {
+  position: relative;
+  width: 128rpx;
+  height: 128rpx;
+  margin: 0 auto 24rpx;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+/* 头像壳子。只有 button 能带 open-type="chooseAvatar"，
+   所以这里把微信默认的按钮样式（背景、边框、内边距、::after 那圈描边）全清掉 */
+.me-avatar-btn {
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  line-height: 1;
+}
+
+.me-avatar-btn::after {
+  border: none;
+}
+
+.me-avatar-hover {
+  opacity: 0.6;
+}
+
+.me-avatar-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.me-avatar-img-on {
+  opacity: 1;
+}
+
+/* 还没设头像时用会员名首字顶上。名字也没填就留一个空的描边圆 */
 .me-avatar {
-  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 104rpx;
-  height: 104rpx;
-  margin-right: 26rpx;
+  width: 128rpx;
+  height: 128rpx;
   background: var(--nero);
   border-radius: 50%;
 }
@@ -37,15 +84,14 @@
 }
 
 .me-initial {
-  font-size: 38rpx;
+  font-size: 46rpx;
   font-weight: 600;
   line-height: 1;
   color: var(--bianco);
 }
 
 .me-text {
-  flex: 1;
-  min-width: 0;
+  display: block;
 }
 
 .me-name {
@@ -72,13 +118,20 @@
   color: var(--grigio);
 }
 
+/* 上下布局里箭头落在文字下方，所以默认就转成向下（展开），
+   展开后再转到向上（收起）。这里要压过公共的 .sec-mark-on */
 .me-mark {
-  flex: none;
-  margin-left: 20rpx;
+  display: block;
+  margin-top: 16rpx;
   font-size: 30rpx;
   line-height: 1;
   color: var(--grigio-chiaro);
+  transform: rotate(90deg);
   transition: transform 220ms ease;
+}
+
+.me-mark.sec-mark-on {
+  transform: rotate(270deg);
 }
 
 /* ---------- 折叠段 ---------- */

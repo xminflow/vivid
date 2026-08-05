@@ -31,6 +31,7 @@ FIELD_MESSAGES = {
     "birthday": "生日不在可选范围内",
     "gender": "性别选项不正确",
     "region": "地区选择不正确",
+    "avatarKey": "头像标识不合法",
     "code": "登录信息缺失，请重试",
 }
 

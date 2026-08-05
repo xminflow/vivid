@@ -56,6 +56,7 @@ with psycopg.connect(DATABASE_URL) as c:
 | POST | `/api/auth/login` | 用 `wx.login` 的 code 换登录态 |
 | GET | `/api/users/me` | 读当前用户资料，要带 token |
 | PUT | `/api/users/me` | 整份保存「我的信息」，要带 token |
+| PUT | `/api/users/me/avatar` | 换头像，传 COS 对象键，要带 token |
 | GET | `/api/users/me/appointments` | 当前用户自己的预约记录 |
 
 FastAPI 自带文档在 `/docs`。
@@ -111,6 +112,27 @@ POST 请求体（小程序传驼峰，模型两边都收）：
 未登录也能提交预约（`user_id` 留空）；带了 token 提交就会记上归属，`/api/users/me/appointments`
 才拉得到自己的记录。
 
+## 头像
+
+微信在 2022-10-25 之后收回了 `wx.getUserProfile` 的头像昵称（现在只返回灰色默认头像和
+「微信用户」），所以头像不可能在登录时静默拿到，只能由用户在「我的」页点一下
+`open-type="chooseAvatar"` 的按钮主动选。链路：
+
+```
+小程序 button open-type="chooseAvatar" → 微信给一个本机临时路径（wxfile://，重启即失效）
+  → POST /api/upload-url 换直传地址 → 客户端 PUT 到 COS
+  → PUT /api/users/me/avatar {avatarKey} → 落 users.avatar_key
+  → 之后任何返回 user 的接口，avatarUrl 都是按这个键现签的临时地址
+```
+
+- 库里存的是**对象键**不是 URL：桶和地域会变，存 URL 会整批失效
+- 头像地址签 7 天（`cos.AVATAR_EXPIRE_SECONDS`），比后台看图的 1 小时长得多——小程序把
+  资料快照存在本机，下次冷启动先拿快照渲染，签太短用户第一眼就是一张拉不出来的图
+- `avatar_key` 和 `avatar_url` 是两列：后者是微信授权给的外链，来源和生命周期都不同。
+  出接口时 `avatar_key` 优先，没有才回落到 `avatar_url`，都没有就是空串，页面显示会员名首字
+- 换头像不走 `PUT /api/users/me`：那个接口是整份覆盖 + 前端防抖，头像混进去会被反复重传，
+  且表单里任一字段校验不过会连头像一起失败
+
 ## 测试
 
 ```bash
@@ -140,6 +162,9 @@ uv run pytest -v
 
 - 换成备案的 https 域名，在小程序后台配 request 合法域名（改 `antony-casa/utils/config.js` 的 `API_BASE`）
 - **给 `GET /api/appointments` 加鉴权**——现在是裸奔的，任何人都能拉走全部客户姓名和手机号
+- **把 COS 桶权限收成「私有读写」**——实测当前开发桶是「公有读私有写」，对象键虽然是 uuid
+  且不能列举，但只要 URL 泄漏（转发、日志、截图），客户上传的房屋照片和头像谁都能长期访问。
+  代码这边读写一律走预签名，改成私有读后不用动代码
 - CORS 从 `*` 收窄到具体域名
 - 生产环境的 `WORKER_ID` 按机器分配，别几台都用默认的 0
 - `.env` 里的 `WX_SECRET` 换成生产小程序的；secret 一旦外泄要去后台重置

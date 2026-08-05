@@ -30,6 +30,11 @@ CREATE TABLE IF NOT EXISTS users (
   -- 微信授权资料（用户点头像昵称填写时才有，可能一直是空）
   nickname      text        NOT NULL DEFAULT '' CHECK (length(nickname) <= 60),
   avatar_url    text        NOT NULL DEFAULT '',
+  -- 用户在「我的」页用 open-type="chooseAvatar" 选的头像，存 COS 对象键不存 URL：
+  -- 桶是私有的，地址要服务端现签（见 app/cos.py）；且桶和地域将来会变，存 URL 会全部失效。
+  -- 与 avatar_url 分开两列：那列是微信给的外链，来源和生命周期都不同，混用会互相覆盖
+  avatar_key    text        NOT NULL DEFAULT ''
+                            CONSTRAINT users_avatar_key_len CHECK (length(avatar_key) <= 200),
 
   -- 「我的信息」表单，用户自己填，都可以留空
   member_name   text        NOT NULL DEFAULT '' CHECK (length(member_name) <= 40),
@@ -61,6 +66,20 @@ CREATE TABLE IF NOT EXISTS users (
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now()
 );
+
+-- 上面的 CREATE TABLE 对已经建好的库不生效，avatar_key 得单独补。
+-- 带默认值加列在 PG 11+ 不重写全表，存量行直接读到 ''，旧版本代码不引用该列，可直接回滚
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_key text NOT NULL DEFAULT '';
+
+-- 约束得单独补，且 Postgres 没有 ADD CONSTRAINT IF NOT EXISTS。
+-- 已经加过就吞掉 duplicate_object，让本文件保持可重复执行
+DO $$
+BEGIN
+  ALTER TABLE users
+    ADD CONSTRAINT users_avatar_key_len CHECK (length(avatar_key) <= 200);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- 后台按注册时间倒序翻列表
 CREATE INDEX IF NOT EXISTS users_created_at_idx ON users (created_at DESC);

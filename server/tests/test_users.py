@@ -7,12 +7,15 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app import cos
 from app import users as users_module
 from app.db import pool
 from app.main import app
 from app.snowflake import Snowflake
 
 TEST_OPENID_PREFIX = "test_openid_"
+# 形状跟 cos.build_key 生成的一致。测试不真传文件，只验从对象键往后的落库与出参
+TEST_AVATAR_KEY = "uploads/avatar/20260804/0123456789abcdef0123456789abcdef.jpg"
 
 
 def fake_session(openid: str, unionid: str | None = None):
@@ -192,6 +195,65 @@ async def test_profile_rejects_a_future_birthday(client):
     )
     assert r.status_code == 400
     assert r.json()["message"] == "生日不在可选范围内"
+
+
+# ---------------------------------------------------------------- 头像
+
+
+async def test_avatar_is_stored_as_a_key_and_returned_as_a_signed_url(client):
+    token = (await login(client))["token"]
+    auth = {"Authorization": f"Bearer {token}"}
+
+    saved = await client.put(
+        "/api/users/me/avatar", json={"avatarKey": TEST_AVATAR_KEY}, headers=auth
+    )
+    assert saved.status_code == 200, saved.text
+
+    async with pool.connection() as conn:
+        row = await (
+            await conn.execute("SELECT avatar_key FROM users WHERE token = %s", (token,))
+        ).fetchone()
+    assert row["avatar_key"] == TEST_AVATAR_KEY
+
+    user = (await client.get("/api/users/me", headers=auth)).json()["user"]
+    # 对象键是内部标识，不能原样出接口——客户端拿着它也取不到图，只会被当成能拼 URL 的东西
+    assert user["avatarUrl"] != TEST_AVATAR_KEY
+    if cos.configured():
+        assert user["avatarUrl"].startswith("https://")
+        assert "q-signature=" in user["avatarUrl"]
+    else:
+        # 没配 COS 就签不出地址，回落到微信授权的外链（这里是空），页面显示会员名首字
+        assert user["avatarUrl"] == ""
+
+
+async def test_avatar_rejects_a_key_we_never_issued(client):
+    token = (await login(client))["token"]
+    auth = {"Authorization": f"Bearer {token}"}
+
+    for bad in ("secrets/keys.jpg", "uploads/../../etc/passwd", ""):
+        r = await client.put("/api/users/me/avatar", json={"avatarKey": bad}, headers=auth)
+        assert r.status_code == 400, f"{bad} 应当被拒: {r.text}"
+
+
+async def test_avatar_needs_a_token(client):
+    r = await client.put("/api/users/me/avatar", json={"avatarKey": TEST_AVATAR_KEY})
+    assert r.status_code == 401
+
+
+async def test_saving_the_profile_does_not_wipe_the_avatar(client):
+    """「我的信息」是整份覆盖提交，不能把另一条链路存的头像顺手清掉。"""
+    token = (await login(client))["token"]
+    auth = {"Authorization": f"Bearer {token}"}
+
+    await client.put("/api/users/me/avatar", json={"avatarKey": TEST_AVATAR_KEY}, headers=auth)
+    r = await client.put("/api/users/me", json={"memberName": "陈女士"}, headers=auth)
+    assert r.status_code == 200, r.text
+
+    async with pool.connection() as conn:
+        row = await (
+            await conn.execute("SELECT avatar_key FROM users WHERE token = %s", (token,))
+        ).fetchone()
+    assert row["avatar_key"] == TEST_AVATAR_KEY
 
 
 # ---------------------------------------------------------------- 鉴权
