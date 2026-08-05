@@ -30,7 +30,7 @@ class Snowflake:
     def __init__(self, worker_id: int) -> None:
         if not 0 <= worker_id <= MAX_WORKER_ID:
             raise ValueError(f"WORKER_ID 必须在 0 到 {MAX_WORKER_ID} 之间，当前是 {worker_id}")
-        self._worker_id = worker_id
+        self.worker_id = worker_id
         self._sequence = 0
         self._last_ms = -1
         # FastAPI 是单进程多协程，但 uvicorn 的线程池也可能调到，加锁最省心
@@ -58,7 +58,7 @@ class Snowflake:
                 self._sequence = 0
 
             self._last_ms = now
-            return ((now - EPOCH_MS) << TIMESTAMP_SHIFT) | (self._worker_id << WORKER_ID_SHIFT) | self._sequence
+            return ((now - EPOCH_MS) << TIMESTAMP_SHIFT) | (self.worker_id << WORKER_ID_SHIFT) | self._sequence
 
     @staticmethod
     def _now() -> int:
@@ -97,8 +97,25 @@ def resolve_worker_id() -> int:
     return worker_id
 
 
-_generator = Snowflake(resolve_worker_id())
+# 惰性构建，不在导入期就定下机器号：导入发生在日志配置之前，那时打的日志会被
+# 兜底 handler 吞掉。真正的初始化由 main 的 lifespan 在启动时触发（见 worker_id）
+_generator: Snowflake | None = None
+_generator_lock = threading.Lock()
+
+
+def _get_generator() -> Snowflake:
+    global _generator
+    if _generator is None:
+        with _generator_lock:
+            if _generator is None:
+                _generator = Snowflake(resolve_worker_id())
+    return _generator
+
+
+def worker_id() -> int:
+    """本进程的机器号。首次调用时才真正解析，解析过程自带日志。"""
+    return _get_generator().worker_id
 
 
 def next_id() -> int:
-    return _generator.next_id()
+    return _get_generator().next_id()

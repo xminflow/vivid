@@ -20,6 +20,15 @@ cp .env.example .env
 
 密码含特殊字符时要 percent-encode（`!` → `%21`），否则 URI 解析会出错。
 
+## 日志
+
+级别由 `LOG_LEVEL` 控制，默认 `INFO`，**开发时设成 `DEBUG`**。取值不合法直接启动失败，
+不会悄悄退回默认级别——那会让人以为开了 DEBUG 却看不到日志。
+
+`app/logging_setup.py` 在建 app 之前配好 root logger。不配这一下的话，uvicorn 只给
+自己的 `uvicorn.*` logger 装 handler，业务模块的日志会落到 Python 的兜底 handler：
+没有时间戳和 logger 名，而且 INFO 直接被丢掉。
+
 ## 起服务
 
 ```bash

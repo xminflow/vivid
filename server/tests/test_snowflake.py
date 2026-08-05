@@ -4,9 +4,19 @@
 重复主键，而线上是弹性扩容，靠人工配置保证不了唯一。
 """
 
+import logging
+
 import pytest
 
+from app import snowflake as snowflake_module
+from app.logging_setup import setup_logging
 from app.snowflake import MAX_WORKER_ID, Snowflake, resolve_worker_id
+
+
+@pytest.fixture
+def fresh_generator(monkeypatch):
+    """清掉惰性构建的单例，让本用例自己决定机器号从哪来。"""
+    monkeypatch.setattr(snowflake_module, "_generator", None)
 
 
 def test_显式配置优先(monkeypatch):
@@ -69,3 +79,43 @@ def test_不同机器号同时生成不会撞():
 def test_机器号越界直接拒绝():
     with pytest.raises(ValueError):
         Snowflake(MAX_WORKER_ID + 1)
+
+
+def test_机器号惰性解析且只解析一次(monkeypatch, fresh_generator):
+    """解析要发生在日志配好之后，所以不能在导入期做；解析结果要一直复用。"""
+    monkeypatch.setenv("WORKER_ID", "11")
+    assert snowflake_module.worker_id() == 11
+
+    # 解析过之后再改环境变量不该影响已经在发号的生成器
+    monkeypatch.setenv("WORKER_ID", "12")
+    assert snowflake_module.worker_id() == 11
+
+
+def test_启动时的机器号日志能被看到(monkeypatch, fresh_generator, caplog):
+    """这条日志是多实例撞号唯一的排查依据，必须真的出得来。"""
+    monkeypatch.setenv("WORKER_ID", "9")
+    with caplog.at_level(logging.INFO, logger="app.snowflake"):
+        snowflake_module.worker_id()
+    assert "WORKER_ID 取自环境变量：9" in caplog.text
+
+
+def test_未配置时推导的机器号也会打日志(monkeypatch, fresh_generator, caplog):
+    monkeypatch.delenv("WORKER_ID", raising=False)
+    monkeypatch.setattr("socket.gethostname", lambda: "vivid-server-abc123-x9k2p")
+    with caplog.at_level(logging.WARNING, logger="app.snowflake"):
+        derived = snowflake_module.worker_id()
+    assert "未配置 WORKER_ID" in caplog.text
+    assert f"worker_id={derived}" in caplog.text
+
+
+def test_LOG_LEVEL_取值不合法时直接报错(monkeypatch):
+    """悄悄退回 INFO 会让人以为开了 DEBUG 却看不到日志，越查越偏。"""
+    monkeypatch.setenv("LOG_LEVEL", "VERBOSE")
+    with pytest.raises(ValueError):
+        setup_logging()
+
+
+def test_LOG_LEVEL_留空时用默认级别(monkeypatch):
+    monkeypatch.setenv("LOG_LEVEL", "  ")
+    setup_logging()
+    assert logging.getLogger("app").level == logging.INFO

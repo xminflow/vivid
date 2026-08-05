@@ -1,5 +1,6 @@
 """小程序接口：展厅预约登记、服务申请、COS 图片直传地址签发。"""
 
+import logging
 from contextlib import asynccontextmanager
 
 import psycopg
@@ -10,11 +11,17 @@ from fastapi.responses import JSONResponse
 
 from psycopg.types.json import Json
 
-from . import cos
+from . import cos, snowflake
 from .db import pool
+from .logging_setup import setup_logging
 from .models import AppointmentIn, ServiceApplicationIn, UploadUrlIn
 from .users import current_user_or_none
 from .users import router as users_router
+
+# 在建 app 之前配好，业务模块之后打的日志才有格式、INFO 才出得来
+setup_logging()
+
+logger = logging.getLogger(__name__)
 
 # 校验失败时给用户看的话。pydantic 的英文报错不适合直接弹给用户
 FIELD_MESSAGES = {
@@ -39,6 +46,9 @@ FIELD_MESSAGES = {
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     await pool.open(wait=True, timeout=10)
+    # 机器号在启动时就定下来并打进日志，不等第一个用户注册才初始化——
+    # 多实例撞号必须在启动阶段就能对着日志看出来
+    logger.info("服务启动完成，雪花 ID 机器号 %d", snowflake.worker_id())
     yield
     await pool.close()
 
