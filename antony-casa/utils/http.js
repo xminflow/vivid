@@ -26,16 +26,26 @@ function ensureCloud() {
 }
 
 function sendByCloud(options) {
-  ensureCloud()
-
-  return wx.cloud
-    .callContainer({
-      config: { env: CLOUD.env },
-      path: options.url,
-      method: options.method || 'GET',
-      header: { ...options.header, 'X-WX-SERVICE': CLOUD.service },
-      data: options.data
-    })
+  // 包一层 Promise：ensureCloud 和 callContainer 都可能同步抛（基础库不支持、
+  // 云环境没关联）。同步抛会直接穿透调用方的 .catch，把事件回调整个打断
+  return Promise.resolve()
+    .then(() => ensureCloud())
+    .then(() =>
+      wx.cloud
+        .callContainer({
+          config: { env: CLOUD.env },
+          path: options.url,
+          method: options.method || 'GET',
+          header: { ...options.header, 'X-WX-SERVICE': CLOUD.service },
+          data: options.data
+        })
+        .catch(err => {
+          // 云托管把容器没起来、服务名不对、网络断都抛成同一个 reject，
+          // 统一成用户能看懂的一句，原始信息留在控制台供排查
+          console.error('[http] callContainer 失败', options.url, err)
+          throw new Error('网络异常，请检查后重试')
+        })
+    )
     .then(res => ({ statusCode: res.statusCode, data: res.data || {} }))
 }
 
@@ -61,14 +71,7 @@ function send(options) {
   const header = { 'Content-Type': 'application/json', ...options.header }
   const req = { ...options, header }
 
-  return API_MODE === 'cloud'
-    ? sendByCloud(req).catch(err => {
-        // 云托管把各种失败（容器没起来、服务名不对、网络断）都抛成同一个 reject，
-        // 这里统一成用户能看懂的一句，原始信息留在控制台供排查
-        console.error('[http] callContainer 失败', options.url, err)
-        throw new Error('网络异常，请检查后重试')
-      })
-    : sendByRequest(req)
+  return API_MODE === 'cloud' ? sendByCloud(req) : sendByRequest(req)
 }
 
 module.exports = { send }
