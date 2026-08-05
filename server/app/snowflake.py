@@ -4,9 +4,14 @@
 生成的数远超 JS 的 Number.MAX_SAFE_INTEGER（2^53），出接口必须转字符串。
 """
 
+import hashlib
+import logging
 import os
+import socket
 import threading
 import time
+
+logger = logging.getLogger(__name__)
 
 # 起始时间戳。往后 41 位毫秒够用到 2095 年左右
 EPOCH_MS = 1767225600000  # 2026-01-01 00:00:00 UTC
@@ -60,8 +65,39 @@ class Snowflake:
         return int(time.time() * 1000)
 
 
-# 多机部署时每台机器的 WORKER_ID 必须不同，否则会发出重复 id
-_generator = Snowflake(int(os.getenv("WORKER_ID", "0")))
+def resolve_worker_id() -> int:
+    """决定本进程用哪个机器号。
+
+    机器号必须逐实例不同，否则两个实例在同一毫秒各自从序列 0 开始，会算出完全
+    相同的 id。id 是 users 的主键，重复不会污染数据，但插入会直接失败。
+
+    显式 WORKER_ID 优先。云托管这类平台会自动扩缩容，实例由平台拉起，没法给每个
+    实例配不同的环境变量，所以没配时从主机名推导——容器主机名（Pod 名）带平台生成
+    的唯一后缀，是这里唯一能拿到的实例身份。
+
+    代价说清楚：主机名要压进 10 位，只有 1024 个槽，N 个实例的碰撞概率约 N²/2048
+    （10 个实例约 5%）。这是在「全用默认 0，多实例必冲突」和「平台配不了逐实例变量」
+    之间的取舍，不是没有风险。实例数多或要求确定性时，仍应显式配 WORKER_ID。
+    """
+    raw = os.getenv("WORKER_ID", "").strip()
+    if raw:
+        # 配错了直接抛。静默换成推导值会让「我明明配了」和实际行为对不上，更难查
+        worker_id = int(raw)
+        logger.info("WORKER_ID 取自环境变量：%d", worker_id)
+        return worker_id
+
+    hostname = socket.gethostname()
+    digest = hashlib.sha1(hostname.encode()).digest()
+    worker_id = int.from_bytes(digest[:2], "big") & MAX_WORKER_ID
+    logger.warning(
+        "未配置 WORKER_ID，按主机名推导：hostname=%s worker_id=%d（同批实例请核对是否有重复）",
+        hostname,
+        worker_id,
+    )
+    return worker_id
+
+
+_generator = Snowflake(resolve_worker_id())
 
 
 def next_id() -> int:
