@@ -1,5 +1,8 @@
 // 首页内容。一期不接后端，先写死在这里；接口就绪后把导出换成请求结果即可。
-// 图片是开业前的占位素材，实拍到位后直接替换 assets/home/ 下的同名文件。
+// 图片是开业前的占位素材，存在 COS 上不进包（见 utils/config.js 的 STATIC_BASE）。
+// 实拍到位后换掉 assets/home/ 下的同名文件，跑一次 server/scripts/upload_static.py
+// 覆盖上去即可生效，小程序不用发版。
+const { STATIC_BASE } = require('../utils/config.js')
 
 const brand = {
   wordmark: 'ANTONY CASA',
@@ -14,11 +17,11 @@ const about = {
 
 // 顶部画廊：只放实拍，不压字
 const heroSlides = [
-  { image: '/assets/home/hero-01.jpg' },
-  { image: '/assets/home/hero-02.jpg' },
-  { image: '/assets/home/hero-03.jpg' },
-  { image: '/assets/home/hero-04.jpg' },
-  { image: '/assets/home/hero-05.jpg' }
+  { image: `${STATIC_BASE}/home/hero-01.jpg` },
+  { image: `${STATIC_BASE}/home/hero-02.jpg` },
+  { image: `${STATIC_BASE}/home/hero-03.jpg` },
+  { image: `${STATIC_BASE}/home/hero-04.jpg` },
+  { image: `${STATIC_BASE}/home/hero-05.jpg` }
 ]
 
 // 展厅空间：序号是参观动线的顺序，不是编号装饰
@@ -30,7 +33,7 @@ const spaces = [
     en: 'Sala',
     floor: '一层',
     hours: '周二至周日 10:00 - 19:00',
-    image: '/assets/home/space-01.jpg'
+    image: `${STATIC_BASE}/home/space-01.jpg`
   },
   {
     id: 'atrio',
@@ -39,7 +42,7 @@ const spaces = [
     en: 'Atrio',
     floor: '一层',
     hours: '周二至周日 10:00 - 19:00',
-    image: '/assets/home/space-02.jpg'
+    image: `${STATIC_BASE}/home/space-02.jpg`
   },
   {
     id: 'cucina',
@@ -48,7 +51,7 @@ const spaces = [
     en: 'Cucina',
     floor: '一层',
     hours: '周二至周日 10:00 - 19:00',
-    image: '/assets/home/space-03.jpg'
+    image: `${STATIC_BASE}/home/space-03.jpg`
   },
   {
     id: 'studio',
@@ -57,7 +60,7 @@ const spaces = [
     en: 'Studio',
     floor: '二层',
     hours: '周二至周日 10:00 - 18:00',
-    image: '/assets/home/space-04.jpg'
+    image: `${STATIC_BASE}/home/space-04.jpg`
   },
   {
     id: 'bagno',
@@ -66,7 +69,7 @@ const spaces = [
     en: 'Bagno',
     floor: '二层',
     hours: '周二至周日 10:00 - 18:00',
-    image: '/assets/home/space-05.jpg'
+    image: `${STATIC_BASE}/home/space-05.jpg`
   },
   {
     id: 'tessuti',
@@ -75,13 +78,13 @@ const spaces = [
     en: 'Tessuti',
     floor: '二层',
     hours: '周二至周日 10:00 - 18:00',
-    image: '/assets/home/space-06.jpg'
+    image: `${STATIC_BASE}/home/space-06.jpg`
   }
 ]
 
 // 活动预告：整张海报直接铺出来，文案都在图里，页面不再另起一套字
 const activity = {
-  image: '/assets/home/activity.jpg'
+  image: `${STATIC_BASE}/home/activity.jpg`
 }
 
 module.exports = { brand, about, heroSlides, spaces, activity }

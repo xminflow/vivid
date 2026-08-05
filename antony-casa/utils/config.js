@@ -17,4 +17,11 @@ const CLOUD = {
 // 开发者工具需勾选「不校验合法域名、web-view、TLS 版本以及 HTTPS 证书」
 const API_BASE = 'http://127.0.0.1:3000'
 
-module.exports = { API_MODE, CLOUD, API_BASE }
+// 静态素材（品牌实拍图）放 COS，不进小程序包：主包上限 2MB，这批图占 1.1MB，
+// 而且它们不参与业务逻辑，换图不该走发版。路径稳定可预测，重新上传同名对象即可生效。
+// 上传脚本见 server/scripts/upload_static.py。
+// 与用户上传图的区别：那些走 uploads/ 前缀、键随机、地址现签；这里走 static/ 前缀、
+// 路径固定、直接公开访问。桶权限将来收紧成私有读时，static/ 下的对象要单独设公有读 ACL
+const STATIC_BASE = 'https://antony-casa-dev-1327365963.cos.ap-shanghai.myqcloud.com/static'
+
+module.exports = { API_MODE, CLOUD, API_BASE, STATIC_BASE }

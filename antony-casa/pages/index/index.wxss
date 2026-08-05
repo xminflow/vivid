@@ -16,12 +16,11 @@
 
 .hero-swiper,
 .hero-image {
+  display: block;
   width: 100%;
   height: 100%;
-}
-
-.hero-image {
-  display: block;
+  /* 图走网络加载（COS），首屏未到位时先垫底色，不然是一片刺眼的白 */
+  background: var(--sfondo);
 }
 
 /* 上下各压一道暗渐变：照片再亮，品牌标和页码也读得清 */

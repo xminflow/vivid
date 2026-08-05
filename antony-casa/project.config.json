@@ -17,6 +17,11 @@
         "type": "file",
         "value": "code.jpg",
         "message": "顾问微信码原图，页面用的是裁好的 assets/advisor/wechat-qr.png"
+      },
+      {
+        "type": "folder",
+        "value": "assets/home",
+        "message": "品牌实拍图 1.1MB，已传到 COS 的 static/home/ 由网络加载（见 utils/config.js 的 STATIC_BASE）。文件留在仓库里做版本追溯和换图源，但不进包"
       }
     ],
     "include": []
