@@ -27,9 +27,13 @@ sys.path.insert(0, str(REPO_ROOT / "server"))
 
 from app import cos  # noqa: E402
 
-# 本地目录 -> COS 前缀。只搬品牌素材，tabBar 图标微信强制本地文件，搬不了
-SOURCE_DIR = REPO_ROOT / "antony-casa" / "assets" / "home"
-KEY_PREFIX = "static/home"
+# 本地目录 -> COS 前缀。只搬品牌素材，tabBar 图标微信强制本地文件，搬不了。
+# 加新的一组图就在这里加一行，目录不存在会跳过（素材还没到位时不该让脚本失败）
+ASSETS_ROOT = REPO_ROOT / "antony-casa" / "assets"
+GROUPS = {
+    "home": "static/home",
+    "service": "static/service",
+}
 
 CONTENT_TYPES = {
     ".jpg": "image/jpeg",
@@ -39,19 +43,28 @@ CONTENT_TYPES = {
 }
 
 
-def collect() -> list[Path]:
-    files = sorted(p for p in SOURCE_DIR.iterdir() if p.suffix.lower() in CONTENT_TYPES)
-    if not files:
-        raise SystemExit(f"{SOURCE_DIR} 下没有可上传的图片")
-    return files
+def collect() -> list[tuple[Path, str]]:
+    """返回 (本地文件, COS 对象键)。目录不存在或为空就跳过这一组。"""
+    items: list[tuple[Path, str]] = []
+    for group, prefix in GROUPS.items():
+        directory = ASSETS_ROOT / group
+        if not directory.is_dir():
+            print(f"跳过 {group}/：目录不存在")
+            continue
+
+        files = sorted(p for p in directory.iterdir() if p.suffix.lower() in CONTENT_TYPES)
+        if not files:
+            print(f"跳过 {group}/：目录里没有图片")
+            continue
+
+        items.extend((p, f"{prefix}/{p.name}") for p in files)
+
+    if not items:
+        raise SystemExit("没有可上传的图片")
+    return items
 
 
-def key_of(path: Path) -> str:
-    return f"{KEY_PREFIX}/{path.name}"
-
-
-def upload(path: Path) -> None:
-    key = key_of(path)
+def upload(path: Path, key: str) -> None:
     data = path.read_bytes()
     # Content-Type 要给准：COS 会原样存下来，给成 octet-stream 的话浏览器会当附件下载
     headers = {"Content-Type": CONTENT_TYPES[path.suffix.lower()]}
@@ -63,9 +76,8 @@ def upload(path: Path) -> None:
     print(f"  ↑ {key:<34} {len(data) / 1024:7.1f} KB")
 
 
-def check(path: Path) -> bool:
+def check(key: str) -> bool:
     """按公开地址回读，确认小程序那边真能拿到。"""
-    key = key_of(path)
     resp = httpx.get(cos.object_url(key), timeout=30)
     ok = resp.status_code == 200
     mark = "✓" if ok else "✗"
@@ -82,23 +94,23 @@ def main() -> None:
     if not cos.configured():
         raise SystemExit("缺少 COS 配置，检查 server/.env")
 
-    files = collect()
-    print(f"桶 {cos.host()}，共 {len(files)} 个文件\n")
+    items = collect()
+    print(f"\n桶 {cos.host()}，共 {len(items)} 个文件\n")
 
     if not args.check:
         print("上传：")
-        for path in files:
-            upload(path)
+        for path, key in items:
+            upload(path, key)
         print()
 
     print("校验（公开地址回读）：")
-    failed = [p for p in files if not check(p)]
+    failed = [key for _, key in items if not check(key)]
     if failed:
         raise SystemExit(f"\n{len(failed)} 个文件不可访问")
 
-    total = sum(p.stat().st_size for p in files)
+    total = sum(path.stat().st_size for path, _ in items)
     print(f"\n全部就绪，小程序包可减少 {total / 1024:.0f} KB")
-    print(f"静态地址前缀：https://{cos.host()}/{KEY_PREFIX}/")
+    print(f"静态地址前缀：https://{cos.host()}/static/")
 
 
 if __name__ == "__main__":
