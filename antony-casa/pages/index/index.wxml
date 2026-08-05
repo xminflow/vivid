@@ -28,8 +28,6 @@
     <view class="hero-foot">
       <text class="statement-heading">{{about.heading}}</text>
       <text class="statement-body">{{about.body}}</text>
-      <view class="statement-rule"></view>
-      <text class="statement-closing">{{about.closing}}</text>
 
       <view class="ticks">
         <view

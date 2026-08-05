@@ -105,23 +105,6 @@
   color: var(--su-foto-debole);
 }
 
-.statement-rule {
-  width: 56rpx;
-  height: 2rpx;
-  margin: 26rpx 0 22rpx;
-  background: var(--su-foto);
-}
-
-/* 落款那句，整段的落点，独占一行 */
-.statement-closing {
-  display: block;
-  font-size: 32rpx;
-  font-weight: 500;
-  line-height: 1.55;
-  letter-spacing: var(--ls-display);
-  color: var(--su-foto);
-}
-
 .ticks {
   display: flex;
   align-items: center;
