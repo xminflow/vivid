@@ -41,9 +41,11 @@ COPY --chown=app:app app ./app
 
 USER app
 
-# 与 README、小程序 utils/config.js 里的 API_BASE 一致
-ENV PORT=3001
-EXPOSE 3001
+# 容器内监听端口，HEALTHCHECK 和 CMD 都读它，运行时可用 -e PORT 覆盖。
+# 本地开发（README 里直接跑 uvicorn）仍是 3001，两者不必一致：
+# 宿主机怎么映射由 -p 决定，小程序 utils/config.js 的 API_BASE 跟宿主机端口走
+ENV PORT=3000
+EXPOSE 3000
 
 # /health 会在连接池打开后才可用，所以它同时反映了数据库是否连得上
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
