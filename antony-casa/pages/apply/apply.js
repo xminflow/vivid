@@ -1,7 +1,7 @@
 // 服务申请表单。字段全部由 mock/service.js 的 fields 数组驱动，这里不写死任何一项。
 const { findService } = require('../../mock/service.js')
 const { uploadImage } = require('../../utils/upload.js')
-const { API_BASE } = require('../../utils/config.js')
+const { send } = require('../../utils/http.js')
 const profileStore = require('../../utils/profile.js')
 
 const MAX_PER_GROUP = 6
@@ -191,13 +191,9 @@ Page({
     this.setData({ submitting: true })
     wx.showLoading({ title: '提交中', mask: true })
 
-    wx.request({
-      url: `${API_BASE}/api/service-applications`,
-      method: 'POST',
-      header: { 'Content-Type': 'application/json' },
-      data: payload,
-      success: res => {
-        if (res.statusCode === 201 && res.data && res.data.ok) {
+    send({ url: '/api/service-applications', method: 'POST', data: payload })
+      .then(res => {
+        if (res.statusCode === 201 && res.data.ok) {
           wx.showModal({
             title: '已收到您的申请',
             content: `${this.data.service.name}\n我们会尽快电话与您联系`,
@@ -206,17 +202,19 @@ Page({
             success: () => wx.navigateBack()
           })
         } else {
-          const message = (res.data && res.data.message) || '提交失败，请稍后再试'
-          wx.showToast({ title: message, icon: 'none', duration: 2600 })
+          wx.showToast({
+            title: res.data.message || '提交失败，请稍后再试',
+            icon: 'none',
+            duration: 2600
+          })
         }
-      },
-      fail: () => {
-        wx.showToast({ title: '网络异常，请检查后重试', icon: 'none', duration: 2600 })
-      },
-      complete: () => {
+      })
+      .catch(err => {
+        wx.showToast({ title: err.message, icon: 'none', duration: 2600 })
+      })
+      .then(() => {
         wx.hideLoading()
         this.setData({ submitting: false })
-      }
-    })
+      })
   }
 })

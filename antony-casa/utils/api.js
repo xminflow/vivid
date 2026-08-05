@@ -4,7 +4,7 @@
 // 全程不弹授权框——openid 不需要用户点头，头像昵称才需要，那部分暂时不取。
 // token 存在本机，每个请求自动带上；过期了（401）自动重登一次再重试。
 
-const { API_BASE } = require('./config.js')
+const { send } = require('./http.js')
 
 const TOKEN_KEY = 'authToken'
 const USER_KEY = 'authUser'
@@ -44,21 +44,12 @@ function clearToken() {
   } catch (e) {}
 }
 
-// 裸请求。不判断业务成败，只把 wx.request 变成 Promise
+// 裸请求。不判断业务成败，只负责带上登录态。走哪条链路由 http.js 决定
 function raw(options) {
-  const header = { 'Content-Type': 'application/json' }
+  const header = {}
   if (options.token) header.Authorization = `Bearer ${options.token}`
 
-  return new Promise((resolve, reject) => {
-    wx.request({
-      url: `${API_BASE}${options.url}`,
-      method: options.method || 'GET',
-      header,
-      data: options.data,
-      success: res => resolve({ statusCode: res.statusCode, data: res.data || {} }),
-      fail: () => reject(new Error('网络异常，请检查后重试'))
-    })
-  })
+  return send({ ...options, header })
 }
 
 function wxLogin() {

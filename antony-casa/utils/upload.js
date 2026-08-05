@@ -7,7 +7,7 @@
 // ⚠️ COS 域名要加进小程序后台的 request 合法域名，否则真机上传会被拦：
 //    https://antony-casa-dev-1327365963.cos.ap-shanghai.myqcloud.com
 
-const { API_BASE } = require('./config.js')
+const { send } = require('./http.js')
 
 const MAX_BYTES = 10 * 1024 * 1024
 const ALLOWED_EXTS = ['jpg', 'jpeg', 'png', 'webp', 'heic']
@@ -20,21 +20,9 @@ function extOf(filePath) {
 }
 
 function requestUploadUrl(scene, ext) {
-  return new Promise((resolve, reject) => {
-    wx.request({
-      url: `${API_BASE}/api/upload-url`,
-      method: 'POST',
-      header: { 'Content-Type': 'application/json' },
-      data: { scene, ext },
-      success: res => {
-        if (res.statusCode === 200 && res.data && res.data.ok) {
-          resolve(res.data)
-        } else {
-          reject(new Error((res.data && res.data.message) || '拿不到上传地址'))
-        }
-      },
-      fail: () => reject(new Error('网络异常，请检查后重试'))
-    })
+  return send({ url: '/api/upload-url', method: 'POST', data: { scene, ext } }).then(res => {
+    if (res.statusCode === 200 && res.data.ok) return res.data
+    throw new Error(res.data.message || '拿不到上传地址')
   })
 }
 
