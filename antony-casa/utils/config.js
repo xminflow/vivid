@@ -6,11 +6,19 @@
 //          真机必然失败，所以切过去之后别忘了改回来。
 const API_MODE = 'cloud'
 
-// 云托管环境。env 是小程序已关联的云开发环境 ID，service 是云托管服务名，
-// 两者在微信云托管控制台看。切生产环境时换 env
+// 云托管环境。env 是云开发环境 ID，service 是云托管服务名，都在云开发控制台看。
+// 切生产环境时换 env。
+//
+// resourceAppid：环境属于**别的 appid** 时才填，也就是走环境共享（资源复用）的情况。
+// 填的是「开通该环境的那个小程序/公众号 appid」，不是本小程序的。留空表示环境就在
+// 本小程序名下，直连即可。两种形态的调用方式不同，见 utils/http.js 的 ensureCloud。
+//
+// 前提：环境共享只支持**同主体**的小程序/公众号之间，跨主体做不到；
+// 还要先在资源方的云开发控制台「更多 - 环境共享」里授权给本小程序
 const CLOUD = {
   env: 'dev-d0gsva5ooa1952304',
-  service: 'vivid-server'
+  service: 'vivid-server',
+  resourceAppid: ''
 }
 
 // API_MODE 为 'local' 时才用得上。端口与 server/Dockerfile 的 PORT、README 保持一致。
