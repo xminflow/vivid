@@ -167,3 +167,23 @@ async def test_super_admin_cannot_change_own_password_here(client):
     # 超管密码在配置文件里，接口改不了
     assert r.status_code == 400, r.text
     assert "配置" in r.json()["message"]
+
+
+# ---------------------------------------------------------------------------
+# 鉴权真的覆盖了业务接口
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["/api/admin/appointments", "/api/admin/service-applications", "/api/admin/home-media"],
+)
+async def test_business_endpoints_require_login(client, path):
+    # 这三条出的是全量客户资料和首页配置，没有 token 一条都不能给
+    assert (await client.get(path)).status_code == 401
+
+
+async def test_business_endpoints_work_with_a_token(client):
+    headers = await super_headers(client)
+    r = await client.get("/api/admin/appointments", headers=headers)
+    assert r.status_code == 200, r.text
+    assert r.json()["ok"] is True

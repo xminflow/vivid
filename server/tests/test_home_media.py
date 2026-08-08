@@ -54,10 +54,12 @@ async def wipe() -> None:
 
 
 @pytest.fixture
-async def client():
+async def client(auth_headers):
     await wipe()
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
+    async with AsyncClient(
+        transport=transport, base_url="http://test", headers=auth_headers
+    ) as c:
         yield c
     await wipe()
 

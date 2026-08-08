@@ -29,3 +29,25 @@ async def db():
     await pool.open(wait=True, timeout=10)
     yield
     await pool.close()
+
+
+@pytest.fixture(scope="session")
+async def auth_headers(db) -> dict:
+    """后台接口现在全部要鉴权，各测试文件的 client 统一带上这个头。
+
+    用配置里的超管登录一次，整个会话共用一条 token——每个测试各登一次会白白
+    多跑几十次 scrypt，而 scrypt 是故意做得慢的。
+    """
+    from httpx import ASGITransport, AsyncClient
+
+    from app.admin_auth import SUPER_PASSWORD, SUPER_USERNAME
+    from app.main import app
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        r = await c.post(
+            "/api/admin/auth/login",
+            json={"username": SUPER_USERNAME, "password": SUPER_PASSWORD},
+        )
+        assert r.status_code == 200, r.text
+        return {"Authorization": f"Bearer {r.json()['token']}"}

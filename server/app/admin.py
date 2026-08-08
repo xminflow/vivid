@@ -4,10 +4,10 @@
 
 1. 风险等级不同。小程序那些接口要么只写、要么只出「自己的」数据（`/api/users/me/*`），
    这里出的是**全量**客户姓名和手机号，一条 URL 泄漏就是全部客户资料泄漏。
-2. 鉴权好加。将来给这个 router 挂一个 `dependencies=[Depends(require_admin)]` 就覆盖
-   全部后台接口，不用逐个接口去改，也不会漏掉新加的。
+2. 鉴权好加。这个 router 挂了 `dependencies=[Depends(current_admin)]`，一行覆盖
+   全部后台接口，不用逐个接口去改，新加的接口也不会漏掉。
 
-⚠️ 当前**没有鉴权**，只能在内网或本机开发时用，见 README「上线前要做的」。
+登录与账号管理见 app/admin_auth.py 和 app/admin_accounts.py。
 """
 
 import logging
@@ -15,9 +15,10 @@ from datetime import date, timedelta
 from typing import Annotated, Any
 
 import psycopg
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from . import cos, snowflake
+from .admin_auth import current_admin
 from .db import pool
 from .home import load_slots
 from .models import (
@@ -33,7 +34,10 @@ from .models import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+# 鉴权挂在 router 上而不是逐个接口挂：这样将来在这个文件里加接口，
+# 不需要记得加依赖也一样是受保护的。登录接口在 app/admin_auth.py，
+# 那是独立的 router，不受这一行影响
+router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(current_admin)])
 
 DEFAULT_PAGE_SIZE = 20
 # 单页上限。后台表格一屏放不下更多，且每条服务申请都要现签图片地址，

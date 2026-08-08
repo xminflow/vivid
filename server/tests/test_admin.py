@@ -55,10 +55,14 @@ async def clean() -> None:
 
 
 @pytest.fixture
-async def client():
+async def client(auth_headers):
     await clean()
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
+    # 头挂在 client 上，所有请求都带。小程序那几个公开接口也会带上这个头，
+    # 但它们查的是 users.token，对不上就当没登录，行为不变
+    async with AsyncClient(
+        transport=transport, base_url="http://test", headers=auth_headers
+    ) as c:
         yield c
     await clean()
 

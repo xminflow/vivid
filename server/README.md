@@ -98,7 +98,9 @@ with psycopg.connect(DATABASE_URL) as c:
 服务申请的 `images` 出的是 `{组 id: [{key, url}]}`，`url` 是现签的一小时地址；
 没配 COS 时 `url` 为 `null`——前端据此显示「地址签发失败」，而不是当成客户没传图。
 
-⚠️ **这两个接口现在没有鉴权**，见下面「上线前要做的」。
+以上接口全部要求登录：请求带 `Authorization: Bearer <token>`，token 从
+`POST /api/admin/auth/login` 换来，登录与账号管理见 `app/admin_auth.py` 和
+`app/admin_accounts.py`，运维说明见下面「上线前要做的」。
 
 FastAPI 自带文档在 `/docs`。
 
@@ -290,11 +292,15 @@ bash deploy/deploy.sh --skip-web   # 只更新后端
 - ~~换成备案的 https 域名~~：已部署在 `https://antonycasa.weelume.com`（域名已备案，
   证书 Let's Encrypt 自动续期，TLS 1.2/1.3 都通），小程序也已切到 `API_MODE = 'server'`。
   **只差最后一步**：小程序后台「开发管理 - 开发设置 - 服务器域名」把它加进 request 合法域名
-- **给 `/api/admin/*` 加鉴权**——现在是裸奔的，任何人都能拉走全部客户姓名和手机号。
-  自从有了首页配图那几个接口，**风险从「读」变成了「写」**：不加鉴权的话，任何人都能
-  往桶里传图并替换掉线上小程序首页的所有配图。上线前必须先加。
-  接口都挂在 `app/admin.py` 的一个 router 上，给它加一个 `dependencies=[Depends(...)]`
-  就能一次覆盖全部后台接口，新加的也不会漏
+- ~~后台接口 `/api/admin/*` 没有鉴权~~ 已完成：需要登录才能访问。
+  超级管理员由 `.env` 的 `ADMIN_SUPER_USERNAME` / `ADMIN_SUPER_PASSWORD` 指定，
+  **上线前务必换成强密码**。其余管理员账号由超管登录后台后在「账号管理」页创建，
+  系统没有注册入口。
+
+  超管的密码在配置里，系统内改不了——改密码 = 改 `.env` + 重启服务。
+  换来的是超管既停用不了也删不掉，后台不会被锁死在门外。
+- CORS 现在是 `allow_origins=["*"]`。登录态走 `Authorization` 头不走 cookie，
+  `*` 不构成漏洞，但上线时仍应收窄到后台的具体域名。
 - **把 COS 桶权限收成「私有读写」**——实测当前开发桶是「公有读私有写」，对象键虽然是 uuid
   且不能列举，但只要 URL 泄漏（转发、日志、截图），客户上传的房屋照片和头像谁都能长期访问。
   代码这边读写一律走预签名，改成私有读后不用动代码。
@@ -302,7 +308,6 @@ bash deploy/deploy.sh --skip-web   # 只更新后端
   `static/` 下的对象单独设公有读 ACL，否则首页图全挂（见下面「静态素材」）。
   注意后台配的首页图落在 `static/home-media/` 下、且是**持续新增**的，
   所以要的是「前缀级别的公有读策略」，不是一次性给现有对象打 ACL
-- CORS 从 `*` 收窄到具体域名
 - `WORKER_ID`：自建服务器是单实例，固定 `0` 即可（云托管那种自动扩缩容的平台才要留空
   走主机名推导）。将来加实例必须逐实例不同，否则雪花 ID 会撞主键
 - 服务器上的 `.env` 里 `WX_SECRET` 和 COS 密钥都还是开发环境那套，要换成生产的；
