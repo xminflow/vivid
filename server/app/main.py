@@ -13,6 +13,7 @@ from psycopg.types.json import Json
 
 from . import cos, snowflake
 from .admin import router as admin_router
+from .admin_accounts import router as admin_accounts_router
 from .admin_auth import router as admin_auth_router
 from .db import pool
 from .home import router as home_router
@@ -77,6 +78,7 @@ app.include_router(admin_auth_router)
 app.include_router(users_router)
 app.include_router(home_router)
 app.include_router(admin_router)
+app.include_router(admin_accounts_router)
 
 
 @app.exception_handler(RequestValidationError)

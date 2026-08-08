@@ -220,10 +220,11 @@ assert ADMIN_PATHS, "遍历路由表得到了空列表，鉴权覆盖测试形�
 async def test_business_endpoints_require_login(client, path, method):
     """不带 token 时，/api/admin/ 下任何一条业务接口（登录本身除外）都要 401。
 
-    路径里 `{slot}` 这类占位符随便填一个合法值——鉴权是路由器级别的依赖，在
-    请求体解析、路径参数校验之前就生效，占位符填什么不影响这里断言的 401。
+    路径里 `{slot}`、`{account_id}` 这类占位符随便填一个合法值——鉴权是路由器
+    级别的依赖，在请求体解析、路径参数校验之前就生效，占位符填什么不影响这里
+    断言的 401。
     """
-    url = path.format(slot="hero")
+    url = path.format(slot="hero", account_id="1")
     r = await client.request(method, url)
     assert r.status_code == 401, f"{method} {url}: {r.text}"
 
@@ -233,3 +234,179 @@ async def test_business_endpoints_work_with_a_token(client):
     r = await client.get("/api/admin/appointments", headers=headers)
     assert r.status_code == 200, r.text
     assert r.json()["ok"] is True
+
+
+# ---------------------------------------------------------------------------
+# 账号管理
+
+
+async def make_account(client, headers, username="test.alice", password="alice-pass-1"):
+    r = await client.post(
+        "/api/admin/accounts",
+        headers=headers,
+        json={"username": username, "displayName": "爱丽丝", "password": password},
+    )
+    assert r.status_code == 201, r.text
+    return r.json()["account"]
+
+
+async def test_super_creates_an_account_that_can_log_in(client):
+    headers = await super_headers(client)
+    account = await make_account(client, headers)
+    assert account["username"] == "test.alice"
+    assert account["status"] == "active"
+    # 雪花 ID 超出 JS 安全整数范围，出接口必须是字符串
+    assert isinstance(account["id"], str)
+    # 哈希一个字节都不能出接口
+    assert "password" not in account and "passwordHash" not in account
+
+    r = await login(client, "test.alice", "alice-pass-1")
+    assert r.status_code == 200, r.text
+    assert r.json()["user"]["isSuper"] is False
+
+
+async def test_normal_admin_cannot_touch_account_management(client):
+    headers = await super_headers(client)
+    await make_account(client, headers)
+    r = await login(client, "test.alice", "alice-pass-1")
+    alice = {"Authorization": f"Bearer {r.json()['token']}"}
+
+    assert (await client.get("/api/admin/accounts", headers=alice)).status_code == 403
+    r = await client.post(
+        "/api/admin/accounts",
+        headers=alice,
+        json={"username": "test.bob", "displayName": "", "password": "bob-pass-11"},
+    )
+    assert r.status_code == 403
+    # 但业务接口她是能看的
+    assert (await client.get("/api/admin/appointments", headers=alice)).status_code == 200
+
+
+async def test_normal_admin_changes_own_password(client):
+    headers = await super_headers(client)
+    await make_account(client, headers)
+    r = await login(client, "test.alice", "alice-pass-1")
+    alice = {"Authorization": f"Bearer {r.json()['token']}"}
+
+    bad = await client.put(
+        "/api/admin/auth/password",
+        headers=alice,
+        json={"oldPassword": "wrong-one-11", "newPassword": "alice-pass-2"},
+    )
+    assert bad.status_code == 400, bad.text
+
+    ok = await client.put(
+        "/api/admin/auth/password",
+        headers=alice,
+        json={"oldPassword": "alice-pass-1", "newPassword": "alice-pass-2"},
+    )
+    assert ok.status_code == 200, ok.text
+
+    assert (await login(client, "test.alice", "alice-pass-1")).status_code == 401
+    assert (await login(client, "test.alice", "alice-pass-2")).status_code == 200
+    # 改密码的那条会话自己留着，不用重登
+    assert (await client.get("/api/admin/auth/me", headers=alice)).status_code == 200
+
+
+async def test_reserved_and_duplicate_usernames_are_refused(client):
+    headers = await super_headers(client)
+    reserved = await client.post(
+        "/api/admin/accounts",
+        headers=headers,
+        json={"username": SUPER_USERNAME, "displayName": "", "password": "whatever-11"},
+    )
+    # 建一个和超管同名的普通账号，登录时永远被超管判定抢先命中，是个点不动的鬼影
+    assert reserved.status_code == 400, reserved.text
+
+    await make_account(client, headers)
+    dup = await client.post(
+        "/api/admin/accounts",
+        headers=headers,
+        json={"username": "test.alice", "displayName": "", "password": "another-11"},
+    )
+    assert dup.status_code == 409, dup.text
+
+
+async def test_bad_username_or_short_password_is_rejected(client):
+    headers = await super_headers(client)
+    short = await client.post(
+        "/api/admin/accounts",
+        headers=headers,
+        json={"username": "test.bob", "displayName": "", "password": "short"},
+    )
+    assert short.status_code == 400
+    bad_name = await client.post(
+        "/api/admin/accounts",
+        headers=headers,
+        json={"username": "有中文", "displayName": "", "password": "good-pass-11"},
+    )
+    assert bad_name.status_code == 400
+
+
+async def test_disabling_an_account_kills_its_session_immediately(client):
+    headers = await super_headers(client)
+    account = await make_account(client, headers)
+    r = await login(client, "test.alice", "alice-pass-1")
+    alice = {"Authorization": f"Bearer {r.json()['token']}"}
+    assert (await client.get("/api/admin/appointments", headers=alice)).status_code == 200
+
+    r = await client.put(
+        f"/api/admin/accounts/{account['id']}/status",
+        headers=headers,
+        json={"status": "disabled"},
+    )
+    assert r.status_code == 200, r.text
+
+    # 手上那条 token 立刻不作数
+    assert (await client.get("/api/admin/appointments", headers=alice)).status_code == 401
+    # 也登不回来
+    assert (await login(client, "test.alice", "alice-pass-1")).status_code == 403
+
+
+async def test_reset_password_logs_the_account_out_everywhere(client):
+    headers = await super_headers(client)
+    account = await make_account(client, headers)
+    r = await login(client, "test.alice", "alice-pass-1")
+    alice = {"Authorization": f"Bearer {r.json()['token']}"}
+
+    r = await client.put(
+        f"/api/admin/accounts/{account['id']}/password",
+        headers=headers,
+        json={"password": "reset-pass-11"},
+    )
+    assert r.status_code == 200, r.text
+
+    assert (await client.get("/api/admin/auth/me", headers=alice)).status_code == 401
+    assert (await login(client, "test.alice", "reset-pass-11")).status_code == 200
+
+
+async def test_deleting_an_account_cascades_its_sessions(client):
+    headers = await super_headers(client)
+    account = await make_account(client, headers)
+    r = await login(client, "test.alice", "alice-pass-1")
+    alice = {"Authorization": f"Bearer {r.json()['token']}"}
+
+    r = await client.delete(f"/api/admin/accounts/{account['id']}", headers=headers)
+    assert r.status_code == 200, r.text
+
+    assert (await client.get("/api/admin/auth/me", headers=alice)).status_code == 401
+    assert (await login(client, "test.alice", "alice-pass-1")).status_code == 401
+
+
+async def test_operations_on_a_missing_account_are_404(client):
+    headers = await super_headers(client)
+    missing = "1234567890123456789"
+    assert (await client.delete(f"/api/admin/accounts/{missing}", headers=headers)).status_code == 404
+    r = await client.put(
+        f"/api/admin/accounts/{missing}/status", headers=headers, json={"status": "disabled"}
+    )
+    assert r.status_code == 404
+
+
+async def test_account_list_shows_created_accounts(client):
+    headers = await super_headers(client)
+    await make_account(client, headers)
+    r = await client.get("/api/admin/accounts", headers=headers)
+    assert r.status_code == 200, r.text
+    names = [a["username"] for a in r.json()["items"]]
+    assert "test.alice" in names
