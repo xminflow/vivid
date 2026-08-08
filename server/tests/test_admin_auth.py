@@ -173,13 +173,40 @@ async def test_super_admin_cannot_change_own_password_here(client):
 # 鉴权真的覆盖了业务接口
 
 
-@pytest.mark.parametrize(
-    "path",
-    ["/api/admin/appointments", "/api/admin/service-applications", "/api/admin/home-media"],
-)
-async def test_business_endpoints_require_login(client, path):
-    # 这三条出的是全量客户资料和首页配置，没有 token 一条都不能给
-    assert (await client.get(path)).status_code == 401
+# 遍历真实路由表，而不是手抄一份路径清单：将来在 admin.py 里新加接口、或者有人
+# 不小心把某条路由挪出受保护的 router，这条测试都会自动纳入、自动失败，不需要
+# 有人记得回来往清单里补一行——「新接口自动受保护」正是鉴权挂在 router 层而不是
+# 逐个接口挂的意义，这条测试就是在守这个性质本身。
+#
+# 走 app.openapi()["paths"] 而不是直接遍历 app.routes：这个 FastAPI 版本
+# （0.141）里 include_router() 挂上去的子路由不会被立刻拍平进 app.routes，
+# 会包一层内部的 `_IncludedRouter`，直接遍历 app.routes 只能看到在 main.py
+# 里用 @app.xxx 直接定义的那几条，admin/home/users 那些子 router 全部隐身，
+# 断言过不了会以为鉴权哪里漏了，其实是遍历方式不对。openapi() 是 FastAPI
+# 生成 /docs 用的公开接口，本来就要求把全部路由（含嵌套 router）拍平，稳。
+ADMIN_PATHS = [
+    (path, method.upper())
+    for path, methods in app.openapi()["paths"].items()
+    for method in methods
+    if path.startswith("/api/admin/") and not path.startswith("/api/admin/auth/")
+]
+
+# 上面这行推导要是被改挂成空列表，parametrize 会用 0 条用例安静地「全绿」过去，
+# 而这条测试原本就是要盯住「后台路由一条都没漏保护」——放在模块级，写错时收集
+# 阶段就直接报错，不会被 0 用例悄悄放过
+assert ADMIN_PATHS, "遍历路由表得到了空列表，鉴权覆盖测试形同虚设"
+
+
+@pytest.mark.parametrize("path,method", ADMIN_PATHS)
+async def test_business_endpoints_require_login(client, path, method):
+    """不带 token 时，/api/admin/ 下任何一条业务接口（登录本身除外）都要 401。
+
+    路径里 `{slot}` 这类占位符随便填一个合法值——鉴权是路由器级别的依赖，在
+    请求体解析、路径参数校验之前就生效，占位符填什么不影响这里断言的 401。
+    """
+    url = path.format(slot="hero")
+    r = await client.request(method, url)
+    assert r.status_code == 401, f"{method} {url}: {r.text}"
 
 
 async def test_business_endpoints_work_with_a_token(client):

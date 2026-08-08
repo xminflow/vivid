@@ -196,10 +196,10 @@ wsl -d Ubuntu -- bash .../deploy.sh --skip-web
 
 ## 已知遗留
 
-- **`/api/admin/*` 没有鉴权**，而且两个域名都能打到它（Caddyfile 的 `shared`
-  片段里 `/api/*` 是共用的），任何人都能拉走全部客户姓名和手机号。
-  接口都挂在 `app/admin.py` 的一个 router 上，给它加 `dependencies=[Depends(...)]`
-  可以一次覆盖全部后台接口
+- ~~`/api/admin/*` 没有鉴权~~ 已完成：需要登录才能访问（`app/admin.py` 的 router
+  挂了 `dependencies=[Depends(current_admin)]`），见 `server/README.md`「上线前
+  要做的」。两个域名都能打到它这件事本身没变（Caddyfile 的 `shared` 片段里
+  `/api/*` 是共用的），但现在打过去拿不到数据了
 - 后台管理打开就是数据，没有登录页；换到独立子域名只是不容易被撞见，不等于有防护
 - **COS 桶实测是「公有读私有写」**：对象拿到 URL 就能直接下载，签名在读这一侧
   没有拦截作用。桶权限收紧成私有读之后不用改代码，但要给 `static/` 前缀单独设

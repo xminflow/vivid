@@ -37,6 +37,11 @@ async def auth_headers(db) -> dict:
 
     用配置里的超管登录一次，整个会话共用一条 token——每个测试各登一次会白白
     多跑几十次 scrypt，而 scrypt 是故意做得慢的。
+
+    超管这条会话没有归属的 admin_users 行（超管本来就不入库），test_admin_auth.py
+    那个按 `test.` 前缀删 admin_users、靠外键级联清会话的 clean() 碰不到它。不主动
+    删的话，每跑一次全量测试就会在共享的远程开发库里留一条 12 小时有效的超管
+    token，所以这里改成 yield，结束时显式删掉这一条。
     """
     from httpx import ASGITransport, AsyncClient
 
@@ -50,4 +55,11 @@ async def auth_headers(db) -> dict:
             json={"username": SUPER_USERNAME, "password": SUPER_PASSWORD},
         )
         assert r.status_code == 200, r.text
-        return {"Authorization": f"Bearer {r.json()['token']}"}
+        token = r.json()["token"]
+
+    yield {"Authorization": f"Bearer {token}"}
+
+    # 这个 fixture 显式依赖 db，一定在 db 之后建立、也就一定在 db 之前 teardown
+    # （见本文件开头那段注释），执行到这里池必然还开着
+    async with pool.connection() as conn:
+        await conn.execute("DELETE FROM admin_sessions WHERE token = %s", (token,))

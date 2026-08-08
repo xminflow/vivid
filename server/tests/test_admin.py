@@ -93,7 +93,10 @@ async def test_appointment_shows_up_in_admin_list(client):
     assert item["visitDate"] == FUTURE.isoformat()
     assert item["spaceId"] == "sala"
     assert item["status"] == "new"
-    # 未登录提交的没有归属人
+    # client 带的是后台超管的 Bearer 头，不是小程序用户 token（后者走
+    # /api/auth/login 发的、查的是 users.token），current_user_or_none 查不到
+    # 匹配的用户就吞掉异常返回 None，所以这条提交照样没有归属人。真正的匿名
+    # 提交路径（完全不带 Authorization 头）由 test_users.py 守着
     assert item["userId"] is None
 
 

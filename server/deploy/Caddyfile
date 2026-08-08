@@ -74,6 +74,7 @@ admin.antonycasa.weelume.com {
 }
 
 # 说明：FastAPI 自带的 /docs 和 /openapi.json 没有代理出去。
-# /api/admin/* 眼下还没有鉴权，不必再给公网多一份接口清单。
+# /api/admin/* 现在已经要求登录，但公开接口清单本身仍然是免费的信息，
+# 没必要为了方便调试多留一个暴露面。
 # 临时自查可以在服务器上打内网地址：
 #   docker exec antony-casa-caddy wget -qO- http://api:3000/openapi.json
