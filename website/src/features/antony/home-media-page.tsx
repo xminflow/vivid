@@ -41,6 +41,10 @@ const SLOTS: { id: HomeSlot; title: string; hint: string }[] = [
 const MAX_BYTES = 10 * 1024 * 1024
 // 服务端按文件头认这三种（cos.sniff_image_ext），这里的 accept 只是给选择框做过滤
 const ACCEPT = 'image/jpeg,image/png,image/webp'
+// 摆在界面上的格式说明。写出来是因为选择框的过滤只在「选文件」那一刻生效——
+// 拖拽进来、或者在选择框里手动切成「所有文件」，都能选中一个 HEIC 再吃一个报错。
+// ⚠️ 手机直出的 HEIC 不支持（服务端认不出这个文件头），得先转成 JPG
+const FORMATS = 'JPG / PNG / WebP'
 
 type SlotState = Record<HomeSlot, HomeMediaItem[]>
 
@@ -259,6 +263,10 @@ function SlotSection({
       </div>
 
       <p className="mt-1.5 text-xs text-muted-foreground">{slot.hint}</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        支持 {FORMATS}，单张不超过 {MAX_BYTES / 1024 / 1024}MB。
+        手机拍的 HEIC 要先转成 JPG
+      </p>
 
       {/* 清空是「回到小程序里写死的兜底图」，不是「首页这块不显示」。
           这个语义不摆出来，运营会以为自己把首页删空了 */}

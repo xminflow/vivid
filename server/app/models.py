@@ -207,11 +207,12 @@ class ServiceApplicationIn(BaseModel):
 HOME_SLOTS = ("hero", "showroom", "activity")
 HomeSlot = Literal["hero", "showroom", "activity"]
 
-# 每个位置最多放几张。
-#   hero     首屏轮播，再多用户也划不到
-#   showroom 参观动线，六张是当前的量，留一倍余量
+# 每个位置最多放几张。数字按首页实际的版面定，不留「余量」——
+# 上限放宽只会让运营多传的图悄悄不显示，还不如在后台就拦住
+#   hero     首屏画廊五张
+#   showroom 展厅参观动线六张
 #   activity 首页是整张海报铺开、不是轮播，只能一张。库上也有唯一索引兜着
-HOME_SLOT_MAX = {"hero": 10, "showroom": 12, "activity": 1}
+HOME_SLOT_MAX = {"hero": 5, "showroom": 6, "activity": 1}
 
 
 class HomeMediaIn(BaseModel):
