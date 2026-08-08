@@ -1,0 +1,79 @@
+# 两个站点，共用同一个后端容器：
+#
+#   antonycasa.weelume.com        官网（antony-web，面向客户）
+#   admin.antonycasa.weelume.com  后台管理（website，内部用）
+#
+# 证书由 Caddy 分别自动申请并续期，落在 data/caddy/data/ 下。
+# 前提：两个域名都解析到本机，且安全组放行 80（HTTP-01 校验走 80，不通就签不下来）。
+
+# 两个站点重复的部分收在 snippet 里，改一处两边同时生效
+(shared) {
+	encode zstd gzip
+
+	# 上线几分钟就有扫描器来试 /.env、/.git/HEAD、/.ssh/id_rsa。下面的 SPA 回落
+	# 会把它们统统变成 index.html 返回 200——内容没泄漏，但 200 会让扫描器判定
+	# 「存在」，也把访问日志刷满。点开头的路径本来就不是前端路由，直接 404。
+	# 必须排除 /.well-known/：Let's Encrypt 的 HTTP-01 校验走这个前缀，
+	# 拦掉的话证书续期会失败（首签能过是因为签发时这条规则还没生效，很难查）
+	@dotfiles {
+		path_regexp ^/\.
+		not path /.well-known/*
+	}
+	respond @dotfiles 404
+
+	# 接口。两个站点都要用：官网提交预约和服务申请，后台读列表。
+	# 反代目标是 compose 网络里的服务名，端口与 Dockerfile 的 PORT 一致
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+}
+
+# ---------------------------------------------------------------- 官网
+antonycasa.weelume.com {
+	# 用 route 而不是散着写 handle：route 严格按书写顺序匹配，
+	# 而 handle 之间是按 matcher 特异性重排的，正则 matcher 排在哪不好预期
+	route {
+		import shared
+
+		# 存活检查。同时反映数据库连得上没有——连接池打开后 /health 才可用
+		handle /health {
+			reverse_proxy api:3000
+		}
+
+		# 其余路径出官网 SPA。react-router 用的是 history 路由，深链接直接刷新时
+		# 磁盘上并没有对应文件，必须回落到 index.html，否则一刷新就 404
+		handle {
+			root * /srv/site
+			try_files {path} /index.html
+			file_server
+		}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
+
+# ------------------------------------------------------------ 后台管理
+admin.antonycasa.weelume.com {
+	route {
+		import shared
+
+		handle {
+			root * /srv/admin
+			try_files {path} /index.html
+			file_server
+		}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
+
+# 说明：FastAPI 自带的 /docs 和 /openapi.json 没有代理出去。
+# /api/admin/* 眼下还没有鉴权，不必再给公网多一份接口清单。
+# 临时自查可以在服务器上打内网地址：
+#   docker exec antony-casa-caddy wget -qO- http://api:3000/openapi.json

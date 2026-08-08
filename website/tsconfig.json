@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ],
+  // 这份只做工程引用，本身不编译代码。paths 写在这里是给 shadcn CLI 读的——
+  // 它按 tsconfig.json 的别名决定组件生成到哪、import 怎么写
+  "compilerOptions": {
+    "paths": { "@/*": ["./src/*"] }
+  }
+}

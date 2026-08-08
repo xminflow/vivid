@@ -54,13 +54,6 @@ async def client():
         )
 
 
-@pytest.fixture(scope="session", autouse=True)
-async def db():
-    await pool.open(wait=True, timeout=10)
-    yield
-    await pool.close()
-
-
 async def login(client, **body) -> dict:
     r = await client.post("/api/auth/login", json={"code": "fake-code", **body})
     assert r.status_code == 200, r.text

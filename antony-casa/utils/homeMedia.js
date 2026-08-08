@@ -1,0 +1,103 @@
+// 首页配图：后台配什么就显示什么。
+//
+// 三层来源，优先级从高到低：
+//   1. 接口 GET /api/home —— 后台「首页图片」页配的，是唯一的事实来源
+//   2. 本机缓存 —— 上一次成功拿到的那份。首屏直接用它渲染，不用等网络回来；
+//                  断网或后端挂了时也是它顶着，首页不会开天窗
+//   3. mock/home.js 里的默认值 —— 从没成功拉到过配置时用（新用户第一次打开就断网、
+//                  或者后台根本还没配过图）。这些是固定地址的图，不占小程序包体积
+//
+// 「某个位置没配 = 用默认值」是和服务端约定好的（见 server/app/home.py）：
+// 后台清空某一组，接口返回空数组，这里就退回默认值——任何时候首页都有图可显示。
+//
+// 代价说明：缓存兜底意味着断网时用户可能看到的是上一次的旧图。这是刻意的取舍，
+// 换的是首页永远不空白；每次拉取失败都会打 error 日志，不会悄悄咽掉。
+
+// 只接管三组图。文案和转发卡片配图仍在 mock/home.js：转发图是各页共用的同一张
+// 品牌形象（见那边的注释），不该只有首页跟着后台配置变
+const { send } = require('./http.js')
+const { heroSlides, showroom, activity } = require('../mock/home.js')
+
+// 带版本号：将来出参结构改了，旧缓存不会被当成新结构读进来
+const CACHE_KEY = 'homeMedia.v1'
+
+// mock/home.js 里那份默认值，拆成和接口一致的形状，下面只走一套合并逻辑
+const DEFAULTS = {
+  hero: heroSlides.map(slide => slide.image),
+  showroom: showroom.images,
+  activity: activity.image
+}
+
+function readCache() {
+  try {
+    const cached = wx.getStorageSync(CACHE_KEY)
+    return cached && typeof cached === 'object' ? cached : null
+  } catch (e) {
+    // 存储读不出来（极少见，比如存储被清理到一半）不该让首页崩掉，当没缓存处理
+    console.error('[homeMedia] 读缓存失败', e)
+    return null
+  }
+}
+
+function writeCache(media) {
+  try {
+    wx.setStorageSync(CACHE_KEY, media)
+  } catch (e) {
+    // 写不进去只影响下次冷启动的首屏速度，这次展示不受影响
+    console.error('[homeMedia] 写缓存失败', e)
+  }
+}
+
+function pickList(list, fallback) {
+  return Array.isArray(list) && list.length ? list : fallback
+}
+
+/**
+ * 把一份配置合成 setData 能直接吃的形状。空的位置退回默认值。
+ * 返回的键对应 pages/index/index.js 的 data 结构，改那边的字段名要一起改。
+ */
+function toPageData(media) {
+  const config = media || {}
+
+  return {
+    heroSlides: pickList(config.hero, DEFAULTS.hero).map(image => ({ image })),
+    'showroom.images': pickList(config.showroom, DEFAULTS.showroom),
+    'activity.image': config.activity || DEFAULTS.activity
+  }
+}
+
+/** 立刻能拿到的那份：有缓存用缓存，没有就用包内默认值。不发请求。 */
+function local() {
+  return toPageData(readCache())
+}
+
+/**
+ * 去服务端拉最新配置，成功后写缓存并返回可 setData 的数据。
+ * 失败时抛出，由调用方决定怎么提示——这里不吞异常，也不返回半份数据。
+ */
+function refresh() {
+  return send({ url: '/api/home' }).then(res => {
+    if (res.statusCode !== 200 || !res.data || !res.data.ok) {
+      throw new Error((res.data && res.data.message) || '首页配置读取失败')
+    }
+
+    // 只留自己认识的字段：接口将来加字段不会顺带把缓存撑大
+    const media = {
+      hero: res.data.hero || [],
+      showroom: res.data.showroom || [],
+      activity: res.data.activity || null
+    }
+    console.debug(
+      '[homeMedia] 拉到配置 hero=%d showroom=%d activity=%s updatedAt=%s',
+      media.hero.length,
+      media.showroom.length,
+      media.activity ? '有' : '无',
+      res.data.updatedAt
+    )
+
+    writeCache(media)
+    return toPageData(media)
+  })
+}
+
+module.exports = { local, refresh }

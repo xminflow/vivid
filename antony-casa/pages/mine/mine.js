@@ -3,7 +3,7 @@ const profileStore = require('../../utils/profile.js')
 const appointments = require('../../utils/appointments.js')
 const { uploadImage } = require('../../utils/upload.js')
 const { advisor, genders } = require('../../mock/mine.js')
-const { brand, spaces } = require('../../mock/home.js')
+const { brand, shareImage } = require('../../mock/home.js')
 
 const BIRTHDAY_START = '1930-01-01'
 
@@ -13,12 +13,6 @@ const STATE_TEXT = {
   confirmed: '已确认',
   visited: '已到访',
   cancelled: '已取消'
-}
-
-// 服务端只存 spaceId，展厅名字在前端
-function spaceName(spaceId) {
-  const space = spaces.find(s => s.id === spaceId)
-  return space ? space.name : ''
 }
 
 function todayStr() {
@@ -125,7 +119,6 @@ Page({
       records: rows.map(r => ({
         ...r,
         dateText: formatDate(r.visitDate),
-        spaceName: r.spaceName || spaceName(r.spaceId),
         stateText: STATE_TEXT[r.status] || '待确认'
       }))
     })
@@ -235,7 +228,8 @@ Page({
   onShareAppMessage() {
     return {
       title: 'ANTONY CASA 杭州展厅',
-      path: '/pages/index/index'
+      path: '/pages/index/index',
+      imageUrl: shareImage
     }
   }
 })

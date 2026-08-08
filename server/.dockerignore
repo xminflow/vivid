@@ -14,3 +14,6 @@ README.md
 schema.sql
 Dockerfile
 .dockerignore
+# 部署编排。schema.sql / Caddyfile 是直接 scp 到服务器的，不进镜像；
+# 这里排掉也顺带保证 deploy/.env 这类真实配置不会被打进构建上下文
+deploy/

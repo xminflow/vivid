@@ -1,14 +1,15 @@
 // 请求传输层：把「发一个请求给我们自己的后端」这件事收在一处。
 //
-// 后端有两条链路，业务代码不该关心走的是哪条：
-//   cloud —— 微信云托管。走 wx.cloud.callContainer，微信内网直连容器，
-//            不需要备案域名，也不用在小程序后台配 request 合法域名
-//   local —— 直连本机 WSL 里跑的服务。只有开发者工具能连 127.0.0.1，真机连不上
+// 后端有三条链路，业务代码不该关心走的是哪条：
+//   server —— 自建服务器。走 wx.request 打 https 域名，是正式链路
+//   cloud  —— 微信云托管。走 wx.cloud.callContainer，微信内网直连容器，
+//             不需要备案域名，也不用在小程序后台配 request 合法域名
+//   local  —— 直连本机 WSL 里跑的服务。只有开发者工具能连 127.0.0.1，真机连不上
 //
 // 走哪条由 config.js 的 API_MODE 决定。COS 直传不走这里：那是外部域名的
-// 绝对地址，两种模式下都得用 wx.request 直发（见 upload.js）。
+// 绝对地址，三种模式下都得用 wx.request 直发（见 upload.js）。
 
-const { API_MODE, CLOUD, API_BASE } = require('./config.js')
+const { API_MODE, CLOUD, API_BASE, SERVER_BASE } = require('./config.js')
 
 // 初始化只做一次。放在这里而不是 app.js：请求方是这一层，由它自己保证前置条件，
 // 就不用担心页面请求早于 onLaunch 的时序问题。
@@ -76,15 +77,25 @@ function sendByCloud(options) {
     .then(res => ({ statusCode: res.statusCode, data: res.data || {} }))
 }
 
+// server 和 local 都走 wx.request，区别只在打哪个地址
+function baseUrl() {
+  return API_MODE === 'server' ? SERVER_BASE : API_BASE
+}
+
 function sendByRequest(options) {
   return new Promise((resolve, reject) => {
     wx.request({
-      url: `${API_BASE}${options.url}`,
+      url: `${baseUrl()}${options.url}`,
       method: options.method || 'GET',
       header: options.header,
       data: options.data,
       success: res => resolve({ statusCode: res.statusCode, data: res.data || {} }),
-      fail: () => reject(new Error('网络异常，请检查后重试'))
+      fail: err => {
+        // 合法域名没配、证书有问题、域名解析不了都收敛成这一个 fail，只有微信给的
+        // errMsg 才说得清是哪种。不打出来的话线上只剩一句「网络异常」，没法查
+        console.error('[http] request 失败', options.url, err)
+        reject(new Error('网络异常，请检查后重试'))
+      }
     })
   })
 }

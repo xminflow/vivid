@@ -1,10 +1,21 @@
 // 后端接入方式。请求怎么发出去见 utils/http.js。
 //
-// 'cloud'：微信云托管。微信内网直连容器，不用备案域名、不用配 request 合法域名，
-//          真机和开发者工具都能用，是默认链路。
+// 'server'：直连自建服务器 antonycasa.weelume.com。Caddy 收 https 反代到容器里的
+//           FastAPI，库也在同一台机器上，是当前的正式链路。
+//           域名备案已完成（weelume.com 的主体备案覆盖子域名），证书是 Caddy 自动
+//           签发续期的 Let's Encrypt，TLS 1.2/1.3 都通——微信对域名的硬要求都满足了。
+//           剩下的一步在后台：「开发管理 - 开发设置 - 服务器域名」里把它加进 request
+//           合法域名，没加的话真机报「不在以下 request 合法域名列表中」。
+//           开发者工具可以勾「不校验合法域名」先跑，但真机不认这个勾。
+// 'cloud'：微信云托管。微信内网直连容器，不用备案域名、不用配 request 合法域名。
+//          自建服务器之前用的链路，留着做退路——自建机器出问题时改这一行就能切回去。
 // 'local'：直连本机 WSL 里跑的服务，只在改后端时用。127.0.0.1 只有开发者工具连得上，
 //          真机必然失败，所以切过去之后别忘了改回来。
-const API_MODE = 'cloud'
+const API_MODE = 'server'
+
+// API_MODE 为 'server' 时用。必须是 https——小程序不允许 http 请求。
+// 证书由服务器上的 Caddy 自动申请和续期，部署说明见 server/deploy/README.md
+const SERVER_BASE = 'https://antonycasa.weelume.com'
 
 // 云托管环境。env 是云开发环境 ID，service 是云托管服务名，都在云开发控制台看。
 // 切生产环境时换 env。
@@ -32,4 +43,4 @@ const API_BASE = 'http://127.0.0.1:3000'
 // 路径固定、直接公开访问。桶权限将来收紧成私有读时，static/ 下的对象要单独设公有读 ACL
 const STATIC_BASE = 'https://antony-casa-dev-1327365963.cos.ap-shanghai.myqcloud.com/static'
 
-module.exports = { API_MODE, CLOUD, API_BASE, STATIC_BASE }
+module.exports = { API_MODE, CLOUD, API_BASE, SERVER_BASE, STATIC_BASE }

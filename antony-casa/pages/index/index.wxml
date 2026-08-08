@@ -39,59 +39,55 @@
     </view>
   </view>
 
-  <!-- 下：展厅预约。内嵌画廊，按参观动线排 -->
+  <!-- 下：展厅预约。展厅只有一个，六张实拍按参观动线横滑 -->
   <view class="section">
     <view class="head">
       <text class="head-title">展厅预约</text>
       <text class="head-en">Visit</text>
     </view>
 
-    <!-- 内嵌画廊：一屏一间，左右滑动，不露下一张。页码压在图片内侧下沿 -->
+    <!-- 内嵌画廊：一屏一张，左右滑动，不露下一张。页码压在图片内侧下沿 -->
     <view class="gallery-wrap">
       <swiper
         class="gallery"
         circular
         duration="360"
-        bindchange="onSpaceChange"
+        bindchange="onPhotoChange"
       >
-        <swiper-item wx:for="{{spaces}}" wx:key="id">
+        <swiper-item wx:for="{{showroom.images}}" wx:key="*this">
           <view class="card">
-            <image class="card-image" src="{{item.image}}" mode="aspectFill" lazy-load />
+            <image class="card-image" src="{{item}}" mode="aspectFill" lazy-load />
             <!-- 照片有亮有暗，压一道渐变，白色页码才始终读得出来 -->
             <view class="card-veil"></view>
-
-            <view class="card-bar">
-              <view class="card-info">
-                <view class="card-nameline">
-                  <text class="card-ordinal">{{item.ordinal}}</text>
-                  <text class="card-name">{{item.name}} {{item.en}}</text>
-                </view>
-                <text class="card-meta">{{item.hours}}</text>
-                <text class="card-meta">{{brand.city}} · {{item.floor}}</text>
-              </view>
-              <view
-                class="card-cta"
-                hover-class="card-cta-hover"
-                hover-stay-time="120"
-                data-id="{{item.id}}"
-                data-name="{{item.name}}"
-                bindtap="onBook"
-              >
-                <text class="card-cta-line">立即</text>
-                <text class="card-cta-line">预约</text>
-              </view>
-            </view>
           </view>
         </swiper-item>
       </swiper>
 
-      <!-- 页码浮在 swiper 之上，压在图片下沿，不跟着某一张卡片走 -->
+      <!-- 页码浮在 swiper 之上，压在图片下沿，不跟着某一张图滑走 -->
       <view class="gallery-ticks">
         <view
-          class="gtick {{index === spaceIndex ? 'gtick-on' : ''}}"
-          wx:for="{{spaces}}"
-          wx:key="id"
+          class="gtick {{index === photoIndex ? 'gtick-on' : ''}}"
+          wx:for="{{showroom.images}}"
+          wx:key="*this"
         ></view>
+      </view>
+    </view>
+
+    <!-- 信息条：展厅只有一个，所以不跟着图滑，独立压在画廊下面 -->
+    <view class="card-bar">
+      <view class="card-info">
+        <text class="card-name">{{showroom.name}} {{showroom.en}}</text>
+        <text class="card-meta">{{showroom.hours}}</text>
+        <text class="card-meta">{{showroom.floor}}</text>
+      </view>
+      <view
+        class="card-cta"
+        hover-class="card-cta-hover"
+        hover-stay-time="120"
+        bindtap="onBook"
+      >
+        <text class="card-cta-line">立即</text>
+        <text class="card-cta-line">预约</text>
       </view>
     </view>
   </view>

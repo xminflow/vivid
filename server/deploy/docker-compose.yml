@@ -1,0 +1,100 @@
+# antonycasa.weelume.com 的生产编排。三个服务：
+#
+#   caddy     ── 收 80/443，自动签 Let's Encrypt 证书；/api/* 反代到 api，
+#                其余路径出 website/ 的后台管理 SPA
+#   api       ── FastAPI，只在 compose 内网可见，不映射宿主端口
+#   postgres  ── 自建库，同样只在内网可见；数据在 pgdata 卷里
+#
+# 这台机器连不上 Docker Hub（registry-1.docker.io 直连超时），三个镜像全部由
+# 本地 deploy.sh 打包上传后 docker load。所以一律 pull_policy: never——
+# 镜像缺失时立刻报错，好过 compose 卡在拉取上等超时。
+
+name: antony-casa
+
+x-logging: &logging
+  driver: json-file
+  options:
+    # 50G 系统盘，日志不封顶迟早会把盘写满，连 ssh 都登不上
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: antony-casa-postgres
+    restart: unless-stopped
+    pull_policy: never
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TZ: Asia/Shanghai
+    volumes:
+      # 必须挂 /var/lib/postgresql 而不是 /var/lib/postgresql/data：
+      # postgres:18 起 PGDATA 改成了 /var/lib/postgresql/18/docker，镜像声明的
+      # VOLUME 也是 /var/lib/postgresql。挂老路径的话真实数据会落进 docker 自动
+      # 建的匿名卷，容器一重建就没了——看着有卷，实际没持久化
+      - ./data/postgres:/var/lib/postgresql
+      # 官方镜像只在数据目录为空（也就是首次创建库）时执行这里的脚本。
+      # 之后改 schema 不会自动生效，要按 README「改表结构」一节手动跑
+      - ./schema.sql:/docker-entrypoint-initdb.d/10-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    logging: *logging
+
+  api:
+    image: antony-casa-api:${API_TAG:-latest}
+    container_name: antony-casa-api
+    restart: unless-stopped
+    pull_policy: never
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # 库和 API 在同一个 compose 网络里，主机名就是服务名。
+      # 密码若含 URI 保留字符（@ : / ? # 等）这里会拼坏，所以 .env 里的
+      # POSTGRES_PASSWORD 只允许字母数字，见 .env.example
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      WX_APPID: ${WX_APPID}
+      WX_SECRET: ${WX_SECRET}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # 单实例部署，机器号固定 0。将来多实例必须逐实例不同，否则雪花 ID 会撞主键
+      WORKER_ID: ${WORKER_ID:-0}
+      COS_SECRET_ID: ${COS_SECRET_ID}
+      COS_SECRET_KEY: ${COS_SECRET_KEY}
+      COS_BUCKET: ${COS_BUCKET}
+      COS_REGION: ${COS_REGION}
+    logging: *logging
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: antony-casa-caddy
+    restart: unless-stopped
+    pull_policy: never
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # 两份 SPA 产物都走 bind-mount：换前端只要重传 dist，连 reload 都不用，
+      # file_server 每次请求直接读磁盘。site 是官网，admin 是后台管理
+      - ./site/dist:/srv/site:ro
+      - ./website/dist:/srv/admin:ro
+      # 证书和 ACME 账号。caddy 镜像没有声明 VOLUME，不显式挂这两个目录就是纯容器内
+      # 临时数据，重建容器等于把证书扔了重签，而 Let's Encrypt 同域名每周只给 5 次
+      - ./data/caddy/data:/data
+      - ./data/caddy/config:/config
+    logging: *logging
+
+# 三份状态一律 bind mount 到 ./data/ 下，不用 named volume：
+#   1. 目录看得见，tar 一下就是备份，不用去 /var/lib/docker/volumes 里翻
+#   2. named volume 会被 `docker compose down -v` 一起删掉，而这里面是库数据和证书
+#   3. deploy 用户没有 sudo，读不了 /var/lib/docker
+# ./data/postgres 会被 postgres 的 entrypoint chown 成容器内的 postgres 用户，
+# 宿主上 deploy 直接 cat 不了，属正常；备份走 docker compose exec pg_dump，见 README

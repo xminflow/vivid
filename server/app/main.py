@@ -12,7 +12,9 @@ from fastapi.responses import JSONResponse
 from psycopg.types.json import Json
 
 from . import cos, snowflake
+from .admin import router as admin_router
 from .db import pool
+from .home import router as home_router
 from .logging_setup import setup_logging
 from .models import AppointmentIn, ServiceApplicationIn, UploadUrlIn
 from .users import current_user_or_none
@@ -64,6 +66,8 @@ app.add_middleware(
 )
 
 app.include_router(users_router)
+app.include_router(home_router)
+app.include_router(admin_router)
 
 
 @app.exception_handler(RequestValidationError)
@@ -151,38 +155,8 @@ async def create_appointment(
     )
 
 
-@app.get("/api/appointments")
-async def list_appointments() -> JSONResponse:
-    """给后台临时看数据用。上线前必须加鉴权，否则客户手机号裸奔。"""
-    try:
-        async with pool.connection() as conn:
-            rows = await (
-                await conn.execute(
-                    """
-                    SELECT id, name, phone, visitor_type, visit_date, party_size,
-                           purpose, note, space_id, status, created_at
-                      FROM appointments
-                     ORDER BY created_at DESC
-                     LIMIT 100
-                    """
-                )
-            ).fetchall()
-    except psycopg.Error as exc:
-        print(f"[list failed] {exc}")
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"ok": False, "message": "查询失败"},
-        )
-
-    items = [
-        {
-            **row,
-            "visit_date": row["visit_date"].isoformat(),
-            "created_at": row["created_at"].isoformat(),
-        }
-        for row in rows
-    ]
-    return JSONResponse(content={"ok": True, "total": len(items), "items": items})
+# 后台看列表的接口搬到了 app/admin.py 的 GET /api/admin/appointments：
+# 那边有分页和筛选，也是将来统一加鉴权的地方。这里不再留一份只能出 100 条的临时实现。
 
 
 # ---------------------------------------------------------------------------
@@ -258,38 +232,4 @@ async def create_service_application(form: ServiceApplicationIn) -> JSONResponse
     )
 
 
-@app.get("/api/service-applications")
-async def list_service_applications(service_id: str | None = None) -> JSONResponse:
-    """给后台临时看数据用。跟 /api/appointments 一样，上线前必须加鉴权。"""
-    sql = """
-        SELECT id, service_id, name, phone, fields, images, status, created_at
-          FROM service_applications
-    """
-    params: tuple = ()
-    if service_id:
-        sql += " WHERE service_id = %s"
-        params = (service_id,)
-    sql += " ORDER BY created_at DESC LIMIT 100"
-
-    try:
-        async with pool.connection() as conn:
-            rows = await (await conn.execute(sql, params)).fetchall()
-    except psycopg.Error as exc:
-        print(f"[service application list failed] {exc}")
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"ok": False, "message": "查询失败"},
-        )
-
-    items = []
-    for row in rows:
-        # 库里存的是对象键，这里现签成一小时有效的地址，后台才看得到图
-        images = {
-            group: [cos.presign_get(key) for key in keys]
-            for group, keys in (row["images"] or {}).items()
-        } if cos.configured() else {}
-        items.append(
-            {**row, "images": images, "created_at": row["created_at"].isoformat()}
-        )
-
-    return JSONResponse(content={"ok": True, "total": len(items), "items": items})
+# 同上，列表见 GET /api/admin/service-applications。

@@ -110,13 +110,13 @@ CREATE TABLE IF NOT EXISTS appointments (
   name          text        NOT NULL CHECK (length(btrim(name)) BETWEEN 1 AND 40),
   phone         text        NOT NULL CHECK (phone ~ '^1[3-9][0-9]{9}$'),
   visitor_type  text        NOT NULL CHECK (visitor_type IN (
-                              'C端业主', '设计师', '地产开发商',
-                              '酒店民宿业主', '家居行业经销商', '艺术家')),
+                              '业主', '设计师', '地产圈',
+                              '家居圈', '酒店民宿圈', '艺术圈')),
   visit_date    date        NOT NULL,
   party_size    smallint    NOT NULL CHECK (party_size BETWEEN 1 AND 50),
   purpose       text        NOT NULL CHECK (purpose IN (
-                              '展厅参观', '全案设计咨询', '装修与建材选购',
-                              '家居产品选购', '商务合作', '其他')),
+                              '展厅参观', '全案设计咨询', '装修建材订购',
+                              '家具软装选购', '商务合作', '其他')),
   note          text        NOT NULL DEFAULT '' CHECK (length(note) <= 500),
 
   -- 从哪张展厅卡片点进来的，可为空（用户也可能从别处进表单）
@@ -178,3 +178,48 @@ CREATE INDEX IF NOT EXISTS service_applications_created_at_idx
 
 CREATE INDEX IF NOT EXISTS service_applications_service_idx
   ON service_applications (service_id, created_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- 首页配图。原先写死在小程序的 mock/home.js 里，换图要改代码 + 跑上传脚本，
+-- 运营自己动不了。挪进库后由后台「首页图片」页维护，小程序拉接口拿。
+--
+-- 三个位置（slot）共用一张表：字段完全一样（一个对象键 + 一个顺序），
+-- 拆三张表只是把同一份读写逻辑抄三遍。
+--
+-- 业务主键用雪花 ID（app/snowflake.py 生成），与 users 表一致：
+-- 这批记录会随后台操作反复增删，自增 id 的空洞没有意义，将来多小程序合库也不撞。
+CREATE TABLE IF NOT EXISTS home_media (
+  id          bigint      PRIMARY KEY,
+
+  -- 首页上的位置。值与 app/models.py 的 HomeSlot、小程序 mock/home.js 的字段对应
+  --   hero     首屏画廊
+  --   showroom 展厅预约那一组实拍
+  --   activity 近期活动海报
+  slot        text        NOT NULL CHECK (slot IN ('hero', 'showroom', 'activity')),
+
+  -- COS 对象键，不存 URL：桶和地域将来会变，存 URL 会全部失效。
+  -- 这里的键一律在 static/ 前缀下——首页图要能被任何人直接加载，
+  -- 与 uploads/ 那些需要现签地址的用户上传图不是一回事（见 app/cos.py）
+  image_key   text        NOT NULL
+                          CONSTRAINT home_media_image_key_len CHECK (length(image_key) <= 200)
+                          CONSTRAINT home_media_image_key_prefix CHECK (image_key LIKE 'static/%'),
+
+  -- 同一个 slot 内的展示顺序，从 0 开始。后台整组保存时按数组下标重写
+  sort_order  integer     NOT NULL DEFAULT 0,
+
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- 小程序每次进首页都按 slot 取一遍，排序键跟着一起进索引，避免额外排序
+CREATE INDEX IF NOT EXISTS home_media_slot_idx ON home_media (slot, sort_order, id);
+
+-- 活动位只放一张海报（首页是整张铺开的，不是轮播）。约束写在库上而不是只靠
+-- 接口校验：接口将来加别的入口时不会漏掉这条
+CREATE UNIQUE INDEX IF NOT EXISTS home_media_activity_uniq
+  ON home_media (slot) WHERE slot = 'activity';
+
+DROP TRIGGER IF EXISTS home_media_touch_updated_at ON home_media;
+CREATE TRIGGER home_media_touch_updated_at
+  BEFORE UPDATE ON home_media
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();

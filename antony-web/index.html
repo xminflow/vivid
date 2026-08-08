@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="安东尼之家（ANTONY CASA）杭州展厅：一站式高端家居解决方案，提供全案设计、硬装施工、商品买手、售后与流转服务。"
+    />
+    <!-- 首屏是整屏实拍图，全部走 COS。提前建连能省掉一次 DNS + TLS 往返 -->
+    <link rel="preconnect" href="https://antony-casa-dev-1327365963.cos.ap-shanghai.myqcloud.com" />
+    <title>ANTONY CASA 安东尼之家 · 杭州展厅</title>
+
+    <!-- 分享卡片。微信、QQ 这些爬虫不执行 JS，只能读初始 HTML 里的东西，
+         所以标题描述配图都要写死在这里，光靠 React 渲染出来的内容它们看不到。
+         og:image 必须是绝对地址且公开可访问；微信要求分享图不小于 300x300，
+         hero-01 是 1920x1440，比例也接近它推荐的 5:4 -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="ANTONY CASA 安东尼之家" />
+    <meta property="og:title" content="ANTONY CASA 安东尼之家 · 杭州展厅" />
+    <meta
+      property="og:description"
+      content="一站式高端家居解决方案，从空间设计到实景落地全程把控。"
+    />
+    <meta
+      property="og:image"
+      content="https://antony-casa-dev-1327365963.cos.ap-shanghai.myqcloud.com/static/home/hero-01.jpg"
+    />
+    <meta property="og:url" content="https://antonycasa.weelume.com/" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <!--
+      #root 里先放一张首图占位，它有两个作用：
+        1. 分享卡片：微信有时只认页面里真实存在的 <img>，不单看 og:image，
+           而 SPA 的初始 HTML 本来是空的，爬虫什么都抓不到
+        2. 首屏观感：JS 下载解析期间用户看到的是品牌图而不是一片白
+      React 的 createRoot().render() 会清空 #root 的既有子节点，所以挂载后它自动消失，
+      不需要额外的清理代码。图和首屏轮播第一张是同一个 URL，命中缓存不会多下一次。
+      样式内联：这时候 CSS 还没加载完，写在样式表里来不及生效。
+    -->
+    <div id="root">
+      <img
+        src="https://antony-casa-dev-1327365963.cos.ap-shanghai.myqcloud.com/static/home/hero-01.jpg"
+        alt="ANTONY CASA 安东尼之家 · 杭州展厅"
+        style="width: 100%; height: 100vh; object-fit: cover; display: block"
+      />
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -7,7 +7,9 @@
 ## 环境
 
 - Python 3.12，包管理用 [uv](https://docs.astral.sh/uv/)
-- 数据库：腾讯云 PostgreSQL 17，库名 `antony_casa_dev`，表 `appointments`
+- 开发库：腾讯云 PostgreSQL 17，库名 `antony_casa_dev`
+- 生产：自建，跑在 `antonycasa.weelume.com`（Caddy + FastAPI + PostgreSQL 18 三个容器），
+  部署方式见 [`deploy/README.md`](deploy/README.md)
 
 ## 配置
 
@@ -58,18 +60,45 @@ with psycopg.connect(DATABASE_URL) as c:
 
 `schema.sql` 可重复执行（都是 `IF NOT EXISTS`）。库已经建好了，这步只在换库时需要。
 
+已经建好的库要跟上新增的表和约束，走 `migrations/` 下的脚本，同样用上面那条命令、
+把文件名换掉即可。最近一条是 `005_home_media.sql`（首页配图表，纯新增，可先于代码执行）。
+
 ## 接口
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/health` | 存活检查 |
 | POST | `/api/appointments` | 提交预约，成功返回 201 |
-| GET | `/api/appointments` | 最近 100 条，给后台临时看数据用 |
+| POST | `/api/service-applications` | 提交服务申请，成功返回 201 |
+| POST | `/api/upload-url` | 换一个 COS 直传地址 |
 | POST | `/api/auth/login` | 用 `wx.login` 的 code 换登录态 |
 | GET | `/api/users/me` | 读当前用户资料，要带 token |
 | PUT | `/api/users/me` | 整份保存「我的信息」，要带 token |
 | PUT | `/api/users/me/avatar` | 换头像，传 COS 对象键，要带 token |
 | GET | `/api/users/me/appointments` | 当前用户自己的预约记录 |
+| GET | `/api/home` | 首页三组配图，见下面「首页配图」 |
+
+后台管理接口（`app/admin.py`，前端是 `website/`）：
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/admin/appointments` | 展厅预约列表，分页 + 筛选 |
+| GET | `/api/admin/service-applications` | 服务申请列表，分页 + 筛选 |
+| GET | `/api/admin/home-media` | 首页三组配图的当前配置 |
+| PUT | `/api/admin/home-media/{slot}` | 整组替换某个位置的图 |
+| POST | `/api/admin/home-media/upload` | 传一张首页图，返回 COS 对象键 |
+
+两个列表的公共查询参数：`page`（默认 1）、`pageSize`（默认 20，上限 100）、
+`keyword`（姓名或手机号，`%` `_` 按字面量处理）、`status`。
+预约另有 `visitorType`、`purpose`、`visitDateFrom` / `visitDateTo`（筛的是**到访日期**）；
+服务申请另有 `serviceId`、`createdFrom` / `createdTo`（筛的是提交日期，含当天）。
+枚举值传错直接 400，不会带着脏值查库。
+
+返回 `{ok, total, page, pageSize, items}`，`total` 是筛选后的总条数，与当前页无关。
+服务申请的 `images` 出的是 `{组 id: [{key, url}]}`，`url` 是现签的一小时地址；
+没配 COS 时 `url` 为 `null`——前端据此显示「地址签发失败」，而不是当成客户没传图。
+
+⚠️ **这两个接口现在没有鉴权**，见下面「上线前要做的」。
 
 FastAPI 自带文档在 `/docs`。
 
@@ -79,7 +108,7 @@ POST 请求体（小程序传驼峰，模型两边都收）：
 {
   "name": "陈女士",
   "phone": "13612345678",
-  "visitorType": "酒店民宿业主",
+  "visitorType": "酒店民宿圈",
   "visitDate": "2026-10-01",
   "partySize": 4,
   "purpose": "展厅参观",
@@ -172,10 +201,43 @@ uv run python scripts/upload_static.py --check  # 只校验线上可访问
 
 | | `uploads/` | `static/` |
 |---|---|---|
-| 谁传的 | 用户（房屋照片、头像） | 我们（品牌素材） |
-| 对象键 | 服务端随机生成 | 固定路径，可预测 |
-| 出接口 | 现签的临时地址 | 公开地址，写死在小程序里 |
+| 谁传的 | 用户（房屋照片、头像） | 我们（品牌素材、后台配的首页图） |
+| 对象键 | 服务端随机生成 | 脚本传的是固定路径；后台传的是随机键 |
+| 出接口 | 现签的临时地址 | 公开地址 |
 | 桶收私有读后 | 不受影响 | 要单独设公有读 ACL |
+
+## 首页配图
+
+小程序首页的三组图由后台维护，不用发版也不用跑上传脚本：
+
+| slot | 首页上的位置 | 张数上限 |
+|---|---|---|
+| `hero` | 最上方自动轮播的整屏实拍 | 10 |
+| `showroom` | 「展厅预约」下面左右滑动的一组 | 12 |
+| `activity` | 底部整张铺开的活动海报 | 1（库上有唯一索引） |
+
+链路：后台选图 → `POST /api/admin/home-media/upload`（**裸的图片字节**，不是 multipart，
+省一个 `python-multipart` 依赖；服务端按文件头认 JPG/PNG/WebP，不看文件名）→ 落到
+`static/home-media/` 下 → 后台点保存 → `PUT /api/admin/home-media/{slot}` 整组替换 →
+小程序 `GET /api/home` 读到公开直链。
+
+出图地址不现签：首页图本来就是给所有访客看的，签名没有保护作用，还会让地址每次都变、
+微信的图片缓存全部落空。
+
+**「某个位置没配 = 用小程序里写死的兜底图」**（`antony-casa/mock/home.js`），不是
+「没配 = 不显示」。这条约定让三件事可以分开做，中间任何时刻首页都不会开天窗：
+
+1. 跑 `migrations/005_home_media.sql` 建表（表是空的，接口返回三个空数组）
+2. 发布服务端 + 小程序（小程序拉到空配置，显示的还是原来那几张图）
+3. 运营在后台配图（这时才真正换掉）
+
+小程序侧还有一层本机缓存：首屏先用上一次成功拉到的配置渲染，同时请求接口覆盖；
+接口失败就继续用缓存并打 `error` 日志（`antony-casa/utils/homeMedia.js`）。
+代价是断网时用户可能看到上一版的图。
+
+⚠️ **换下来的图不会从 COS 删除**。对象键是随机的，留在桶里不会被谁猜到，且删了就没法
+回退到上一版配置。需要清理时按 `static/home-media/` 前缀列出对象，和
+`SELECT image_key FROM home_media` 对账，差集才是可以删的。
 
 ## 测试
 
@@ -190,29 +252,59 @@ uv run pytest -v
 
 ## 改选项时注意
 
-`来者身份` 和 `预约需求` 的选项值在三处出现，必须逐字一致：
+`来者身份` 和 `预约需求` 的选项值在**五处**出现，必须逐字一致：
 
 1. `schema.sql` 的 CHECK 约束
 2. `app/models.py` 的 `VISITOR_TYPES` / `PURPOSES`
-3. `antony-casa/pages/booking/booking.js` 的同名常量
+3. `antony-casa/pages/booking/booking.js` 的同名常量（小程序）
+4. `antony-web/src/features/booking/content.ts` 的同名常量（官网）
+5. `website/src/features/antony/constants.ts` 的同名常量（后台管理的筛选下拉）
 
-改一处就要改三处，否则表单能选、库里存不进去。
+改一处就要改五处。前四处不一致的后果是表单能选、库里存不进去，且要到用户点提交才暴露；
+第 5 处不一致则是后台的筛选项对不上库里的值，筛出来永远是空的。
+
+**改选项值本身是数据库变更**（`visitor_type` 上有 CHECK 约束），不能只改代码：
+要按 `migrations/` 下的两步走——先放宽约束到新旧并集，发布代码，再回填并收紧。
+参考 `migrations/001_visitor_type_widen.sql` 和 `002_visitor_type_narrow.sql`。
+
+服务申请的文案与表单定义同理，在 `antony-casa/mock/service.js` 和
+`antony-web/src/features/services/content.ts` 各有一份。
 
 `性别` 同理，在三处：`schema.sql` 的 `gender` CHECK、`app/models.py` 的 `GENDERS`、
 `antony-casa/mock/mine.js` 的 `genders`。小程序侧存的是下标，传给服务端前要转成文字
 （库里存文字，不存下标——下标一改顺序，历史数据全错位）。
 
+## 部署
+
+生产环境是自建服务器，不是微信云托管。一条命令（在 WSL 里）：
+
+```bash
+bash deploy/deploy.sh              # 全量
+bash deploy/deploy.sh --skip-web   # 只更新后端
+```
+
+镜像本地构建后 scp 过去 load——那台机器连不上 Docker Hub。详见 [`deploy/README.md`](deploy/README.md)。
+
 ## 上线前要做的
 
-- 换成备案的 https 域名，在小程序后台配 request 合法域名（改 `antony-casa/utils/config.js` 的 `API_BASE`）
-- **给 `GET /api/appointments` 加鉴权**——现在是裸奔的，任何人都能拉走全部客户姓名和手机号
+- ~~换成备案的 https 域名~~：已部署在 `https://antonycasa.weelume.com`（域名已备案，
+  证书 Let's Encrypt 自动续期，TLS 1.2/1.3 都通），小程序也已切到 `API_MODE = 'server'`。
+  **只差最后一步**：小程序后台「开发管理 - 开发设置 - 服务器域名」把它加进 request 合法域名
+- **给 `/api/admin/*` 加鉴权**——现在是裸奔的，任何人都能拉走全部客户姓名和手机号。
+  自从有了首页配图那几个接口，**风险从「读」变成了「写」**：不加鉴权的话，任何人都能
+  往桶里传图并替换掉线上小程序首页的所有配图。上线前必须先加。
+  接口都挂在 `app/admin.py` 的一个 router 上，给它加一个 `dependencies=[Depends(...)]`
+  就能一次覆盖全部后台接口，新加的也不会漏
 - **把 COS 桶权限收成「私有读写」**——实测当前开发桶是「公有读私有写」，对象键虽然是 uuid
   且不能列举，但只要 URL 泄漏（转发、日志、截图），客户上传的房屋照片和头像谁都能长期访问。
   代码这边读写一律走预签名，改成私有读后不用动代码。
   **但 `static/` 前缀是例外**：小程序的品牌实拍图靠公开地址直接加载，桶收紧后要给
-  `static/` 下的对象单独设公有读 ACL，否则首页图全挂（见下面「静态素材」）
+  `static/` 下的对象单独设公有读 ACL，否则首页图全挂（见下面「静态素材」）。
+  注意后台配的首页图落在 `static/home-media/` 下、且是**持续新增**的，
+  所以要的是「前缀级别的公有读策略」，不是一次性给现有对象打 ACL
 - CORS 从 `*` 收窄到具体域名
-- 云托管上不要配 `WORKER_ID`，留空走主机名推导；实例数多时再改成显式分配
-- `.env` 里的 `WX_SECRET` 换成生产小程序的；secret 一旦外泄要去后台重置
-- 换一套生产库账号：`app_dev` 是开发账号，不该用于线上
-- 云库如果开了 IP 白名单，部署机器的出口 IP 要加进去
+- `WORKER_ID`：自建服务器是单实例，固定 `0` 即可（云托管那种自动扩缩容的平台才要留空
+  走主机名推导）。将来加实例必须逐实例不同，否则雪花 ID 会撞主键
+- 服务器上的 `.env` 里 `WX_SECRET` 和 COS 密钥都还是开发环境那套，要换成生产的；
+  secret 一旦外泄要去后台重置
+- 生产库没有配自动备份，见 `deploy/README.md` 的「备份」一节

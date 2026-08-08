@@ -153,8 +153,8 @@
   color: var(--grigio-chiaro);
 }
 
-/* 内嵌画廊：一屏一间，滑到底才换页，右边不留下一张的边 */
-/* 页码要浮在整个 swiper 之上、又不跟着某一张卡片滑走，所以外面套一层做定位参照 */
+/* 内嵌画廊：一屏一张，滑到底才换页，右边不留下一张的边 */
+/* 页码要浮在整个 swiper 之上、又不跟着某一张图滑走，所以外面套一层做定位参照 */
 .gallery-wrap {
   position: relative;
   margin-top: 40rpx;
@@ -162,8 +162,8 @@
 
 .gallery {
   width: 100%;
-  /* swiper 必须给死高度：图 780 + 信息条 180 */
-  height: 960rpx;
+  /* swiper 必须给死高度。信息条已经挪到画廊外面，这里只装图 */
+  height: 780rpx;
 }
 
 .card {
@@ -194,13 +194,12 @@
   pointer-events: none;
 }
 
-/* 压在图片下沿居中。图片左右留白对称，所以拉满整宽居中即可。
-   bottom 从 swiper 底往上量：信息条 180 + 离图片下沿 28 */
+/* 压在图片下沿居中。图片左右留白对称，所以拉满整宽居中即可 */
 .gallery-ticks {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 208rpx;
+  bottom: 28rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -226,11 +225,12 @@
   background: var(--su-foto);
 }
 
-/* 信息条：左边序号、名称与可约信息，右边一道竖线隔开「立即预约」 */
+/* 信息条：左边展厅名与可约信息，右边一道竖线隔开「立即预约」。
+   在画廊外面，左右留白要自己补齐（卡片 40 + 原信息条 32），跟图片边线对齐 */
 .card-bar {
   display: flex;
   align-items: center;
-  padding: 28rpx 32rpx 30rpx;
+  padding: 28rpx 72rpx 30rpx;
 }
 
 .card-info {
@@ -238,24 +238,8 @@
   min-width: 0;
 }
 
-.card-nameline {
-  display: flex;
-  align-items: baseline;
-}
-
-.card-ordinal {
-  flex: none;
-  margin-right: 16rpx;
-  font-size: 24rpx;
-  font-weight: 600;
-  line-height: 1.4;
-  letter-spacing: var(--ls-meta);
-  color: var(--grigio-chiaro);
-}
-
 .card-name {
-  flex: 1;
-  min-width: 0;
+  display: block;
   font-size: 30rpx;
   font-weight: 600;
   line-height: 1.4;

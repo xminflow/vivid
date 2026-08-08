@@ -15,9 +15,17 @@ dist/
 # 小程序构建产物
 miniprogram_npm/
 
+# 实拍原图（单张几十兆，一次换图就是几十 MB 进历史，而且永远删不掉）。
+# 仓库里只留 ffmpeg 压过的网页版，换图流程见 server/scripts/upload_static.py 的注释。
+# 原图请另行归档，这个目录只是本地暂存
+**/assets/**/_source/
+
 # 环境变量与本地配置
 .env
 .env.local
+
+# 分任务执行的进度台账与中间产物，只对本机的那次执行有意义
+.superpowers/
 
 # 编辑器 / 系统
 .DS_Store

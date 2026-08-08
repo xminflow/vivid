@@ -20,22 +20,25 @@
   opacity: 0.6;
 }
 
-/* 尺寸和居中都放在这层普通 view 上，不受 button 基础样式影响 */
+/* 尺寸和居中都放在这层普通 view 上，绝对定位的图和点击层都认它。
+   不靠 overflow 裁圆：iOS 上父级 overflow 对子节点的圆角裁剪并不可靠，
+   下面每个可见节点自己带 border-radius，少一处真机才有的差异 */
 .me-avatar-wrap {
   position: relative;
   width: 128rpx;
   height: 128rpx;
   margin: 0 auto 24rpx;
-  border-radius: 50%;
-  overflow: hidden;
 }
 
-/* 头像壳子。只有 button 能带 open-type="chooseAvatar"，
-   所以这里把微信默认的按钮样式（背景、边框、内边距、::after 那圈描边）全清掉 */
-.me-avatar-btn {
+/* 只接点击，不画任何东西。微信默认的按钮样式（背景、边框、内边距、
+   ::after 那圈描边）全清掉，剩一块铺满 wrap 的透明热区 */
+.me-avatar-hit {
+  position: absolute;
+  top: 0;
+  left: 0;
   display: block;
-  width: 100%;
-  height: 100%;
+  width: 128rpx;
+  height: 128rpx;
   margin: 0;
   padding: 0;
   background: transparent;
@@ -44,12 +47,14 @@
   line-height: 1;
 }
 
-.me-avatar-btn::after {
+.me-avatar-hit::after {
   border: none;
 }
 
-.me-avatar-hover {
-  opacity: 0.6;
+/* button 本身是透明的，按下去要让人看见反馈，就在头像上蒙一层白。
+   不用 opacity：热区是透明的，调它的透明度什么也看不出来 */
+.me-avatar-hit-hover {
+  background: rgba(255, 255, 255, 0.45);
 }
 
 .me-avatar-img {

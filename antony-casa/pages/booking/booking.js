@@ -2,8 +2,8 @@
 const api = require('../../utils/api.js')
 const appointments = require('../../utils/appointments.js')
 
-const VISITOR_TYPES = ['C端业主', '设计师', '地产开发商', '酒店民宿业主', '家居行业经销商', '艺术家']
-const PURPOSES = ['展厅参观', '全案设计咨询', '装修与建材选购', '家居产品选购', '商务合作', '其他']
+const VISITOR_TYPES = ['业主', '设计师', '地产圈', '家居圈', '酒店民宿圈', '艺术圈']
+const PURPOSES = ['展厅参观', '全案设计咨询', '装修建材订购', '家具软装选购', '商务合作', '其他']
 
 const MIN_PARTY = 1
 const MAX_PARTY = 50
@@ -19,8 +19,6 @@ Page({
     visitorTypes: VISITOR_TYPES,
     purposes: PURPOSES,
     today: todayStr(),
-    spaceId: '',
-    spaceName: '',
     submitting: false,
     form: {
       name: '',
@@ -28,20 +26,9 @@ Page({
       visitorTypeIndex: -1,
       visitDate: '',
       partySize: 2,
-      purposeIndex: -1,
+      // 这张表只有首页「立即预约」一个入口，来的都是要看展厅的，先替他选上
+      purposeIndex: PURPOSES.indexOf('展厅参观'),
       note: ''
-    }
-  },
-
-  // 从展厅卡片点进来时带上是哪一间，直接进表单则为空
-  onLoad(query) {
-    const spaceId = query.spaceId || ''
-    const spaceName = query.spaceName ? decodeURIComponent(query.spaceName) : ''
-    this.setData({ spaceId, spaceName })
-
-    // 从某一间点进来的，预约需求默认「展厅参观」
-    if (spaceId) {
-      this.setData({ 'form.purposeIndex': PURPOSES.indexOf('展厅参观') })
     }
   },
 
@@ -97,8 +84,7 @@ Page({
         visitDate: f.visitDate,
         partySize: f.partySize,
         purpose: PURPOSES[f.purposeIndex],
-        note: f.note.trim(),
-        spaceId: this.data.spaceId
+        note: f.note.trim()
       }
     }
   },
@@ -127,7 +113,6 @@ Page({
             partySize: payload.partySize,
             purpose: payload.purpose,
             visitorType: payload.visitorType,
-            spaceName: this.data.spaceName,
             status: 'new'
           })
 

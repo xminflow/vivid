@@ -1,7 +1,16 @@
-// 首页内容。一期不接后端，先写死在这里；接口就绪后把导出换成请求结果即可。
-// 图片是开业前的占位素材，存在 COS 上不进包（见 utils/config.js 的 STATIC_BASE）。
-// 实拍到位后换掉 assets/home/ 下的同名文件，跑一次 server/scripts/upload_static.py
-// 覆盖上去即可生效，小程序不用发版。
+// 首页内容。
+//
+// ⚠️ 三组图（heroSlides / showroom.images / activity.image）现在是**兜底值**，
+// 不是实际展示的内容：正常情况下走后台配置（GET /api/home），只有从没成功拉到过
+// 配置、或后台把某一组清空了，才会用到这里的值。改图请去后台「首页图片」页，
+// 改这里只影响兜底。合并规则见 utils/homeMedia.js。
+//
+// 文案（brand / about / showroom 的名称营业时间 / shareImage）仍然只有这一份，
+// 后台不管，改了要发版。
+//
+// 图存在 COS 上不进包（见 utils/config.js 的 STATIC_BASE）。换兜底图就换掉
+// assets/home/ 下的同名文件，跑一次 server/scripts/upload_static.py 覆盖上去
+// 即可生效，小程序不用发版。
 const { STATIC_BASE } = require('../utils/config.js')
 
 const brand = {
@@ -24,67 +33,31 @@ const heroSlides = [
   { image: `${STATIC_BASE}/home/hero-05.jpg` }
 ]
 
-// 展厅空间：序号是参观动线的顺序，不是编号装饰
-const spaces = [
-  {
-    id: 'sala',
-    ordinal: '01',
-    name: '会客厅',
-    en: 'Sala',
-    floor: '一层',
-    hours: '周二至周日 10:00 - 19:00',
-    image: `${STATIC_BASE}/home/space-01.jpg`
-  },
-  {
-    id: 'atrio',
-    ordinal: '02',
-    name: '中庭',
-    en: 'Atrio',
-    floor: '一层',
-    hours: '周二至周日 10:00 - 19:00',
-    image: `${STATIC_BASE}/home/space-02.jpg`
-  },
-  {
-    id: 'cucina',
-    ordinal: '03',
-    name: '开放餐厨',
-    en: 'Cucina',
-    floor: '一层',
-    hours: '周二至周日 10:00 - 19:00',
-    image: `${STATIC_BASE}/home/space-03.jpg`
-  },
-  {
-    id: 'studio',
-    ordinal: '04',
-    name: '书房',
-    en: 'Studio',
-    floor: '二层',
-    hours: '周二至周日 10:00 - 18:00',
-    image: `${STATIC_BASE}/home/space-04.jpg`
-  },
-  {
-    id: 'bagno',
-    ordinal: '05',
-    name: '主卫',
-    en: 'Bagno',
-    floor: '二层',
-    hours: '周二至周日 10:00 - 18:00',
-    image: `${STATIC_BASE}/home/space-05.jpg`
-  },
-  {
-    id: 'tessuti',
-    ordinal: '06',
-    name: '织物台',
-    en: 'Tessuti',
-    floor: '二层',
-    hours: '周二至周日 10:00 - 18:00',
-    image: `${STATIC_BASE}/home/space-06.jpg`
-  }
-]
+// 展厅只有一个，六张实拍轮着看。images 的顺序就是参观动线的顺序
+const showroom = {
+  name: '杭州展厅',
+  en: 'Showroom',
+  floor: '一至二层',
+  hours: '周二至周日 10:00 - 19:00',
+  images: [
+    `${STATIC_BASE}/home/space-01.jpg`,
+    `${STATIC_BASE}/home/space-02.jpg`,
+    `${STATIC_BASE}/home/space-03.jpg`,
+    `${STATIC_BASE}/home/space-04.jpg`,
+    `${STATIC_BASE}/home/space-05.jpg`,
+    `${STATIC_BASE}/home/space-06.jpg`
+  ]
+}
 
 // 活动预告：整张海报直接铺出来，文案都在图里，页面不再另起一套字
 const activity = {
   image: `${STATIC_BASE}/home/activity.jpg`
 }
 
-module.exports = { brand, about, heroSlides, spaces, activity }
+// 转发卡片的配图。不指定 imageUrl 的话微信拿当前页面截图顶上，截到的可能是
+// 轮播随机某一张、也可能赶上图还没加载完的空白，卡片长什么样完全不可控。
+// 各页共用同一张，保证转出去的卡片是同一个品牌形象。
+// 微信按 5:4 裁剪，最短边不小于 300px——hero-01 是 1920x1440，够用
+const shareImage = `${STATIC_BASE}/home/hero-01.jpg`
+
+module.exports = { brand, about, heroSlides, showroom, activity, shareImage }

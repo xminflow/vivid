@@ -7,13 +7,13 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 from pydantic.alias_generators import to_camel
 
-VISITOR_TYPES = ("C端业主", "设计师", "地产开发商", "酒店民宿业主", "家居行业经销商", "艺术家")
-PURPOSES = ("展厅参观", "全案设计咨询", "装修与建材选购", "家居产品选购", "商务合作", "其他")
+VISITOR_TYPES = ("业主", "设计师", "地产圈", "家居圈", "酒店民宿圈", "艺术圈")
+PURPOSES = ("展厅参观", "全案设计咨询", "装修建材订购", "家具软装选购", "商务合作", "其他")
 # 与小程序 mock/mine.js 的 genders 一致，多一个 '' 表示没填
 GENDERS = ("", "女", "男", "不便告知")
 
-VisitorType = Literal["C端业主", "设计师", "地产开发商", "酒店民宿业主", "家居行业经销商", "艺术家"]
-Purpose = Literal["展厅参观", "全案设计咨询", "装修与建材选购", "家居产品选购", "商务合作", "其他"]
+VisitorType = Literal["业主", "设计师", "地产圈", "家居圈", "酒店民宿圈", "艺术圈"]
+Purpose = Literal["展厅参观", "全案设计咨询", "装修建材订购", "家具软装选购", "商务合作", "其他"]
 Gender = Literal["", "女", "男", "不便告知"]
 
 # 生日选择器的下限，与 pages/mine/mine.js 的 BIRTHDAY_START 一致
@@ -67,6 +67,19 @@ def check_upload_key(key: str) -> str:
     """
     if not key.startswith("uploads/") or ".." in key:
         raise ValueError("图片标识不合法")
+    return key
+
+
+def check_static_key(key: str) -> str:
+    """运营素材的对象键校验，同 check_upload_key，只是前缀不同。
+
+    首页图的地址是公开直链，键写错不会像用户上传那样只是签不出地址，而是
+    直接把首页挂成一片裂图，所以前缀必须卡死在 static/ 下。
+    """
+    if not key.startswith("static/") or ".." in key:
+        raise ValueError("图片标识不合法")
+    if len(key) > 200:
+        raise ValueError("图片标识过长")
     return key
 
 
@@ -125,20 +138,10 @@ class ProfileIn(BaseModel):
         return parts[0], parts[1], parts[2]
 
 
-class AppointmentOut(BaseModel):
-    """后台列表用。这里按库里的下划线字段直出，不转驼峰。"""
-
-    id: int
-    name: str
-    phone: str
-    visitor_type: str
-    visit_date: date
-    party_size: int
-    purpose: str
-    note: str
-    space_id: str | None
-    status: str
-    created_at: object
+# 预约的跟进状态，与 schema.sql 的 appointments.status CHECK 逐字一致。
+# 后台按它筛选，值不合法时 FastAPI 直接挡在接口外，不会带着脏值查库
+APPOINTMENT_STATUSES = ("new", "confirmed", "visited", "cancelled")
+AppointmentStatus = Literal["new", "confirmed", "visited", "cancelled"]
 
 
 # ---------------------------------------------------------------------------
@@ -146,6 +149,10 @@ class AppointmentOut(BaseModel):
 
 SERVICE_IDS = ("design", "hardfit", "buyer", "aftersale", "resale")
 ServiceId = Literal["design", "hardfit", "buyer", "aftersale", "resale"]
+
+# 与 schema.sql 的 service_applications.status CHECK 逐字一致
+SERVICE_APPLICATION_STATUSES = ("new", "contacted", "closed")
+ServiceApplicationStatus = Literal["new", "contacted", "closed"]
 
 # 单个申请里所有图片加起来的上限。防止有人拿这个接口当图床
 MAX_IMAGES = 30
@@ -188,4 +195,42 @@ class ServiceApplicationIn(BaseModel):
         for keys in v.values():
             for key in keys:
                 check_upload_key(key)
+        return v
+
+
+# ---------------------------------------------------------------------------
+# 首页配图
+
+# 与 schema.sql 的 home_media.slot CHECK 逐字一致
+HOME_SLOTS = ("hero", "showroom", "activity")
+HomeSlot = Literal["hero", "showroom", "activity"]
+
+# 每个位置最多放几张。
+#   hero     首屏轮播，再多用户也划不到
+#   showroom 参观动线，六张是当前的量，留一倍余量
+#   activity 首页是整张海报铺开、不是轮播，只能一张。库上也有唯一索引兜着
+HOME_SLOT_MAX = {"hero": 10, "showroom": 12, "activity": 1}
+
+
+class HomeMediaIn(BaseModel):
+    """整组替换某个位置的图。
+
+    传的是**整组**而不是单张增删：顺序由数组下标决定，一次提交就是一个完整状态，
+    后台两个人同时改也不会出现「一半新一半旧」的中间态。
+    传空数组表示清空该位置，小程序会回退到包内的默认图（见 app/home.py）。
+    """
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    keys: list[Trimmed] = Field(default_factory=list)
+
+    @field_validator("keys")
+    @classmethod
+    def keys_look_like_ours(cls, v: list[str]) -> list[str]:
+        for key in v:
+            check_static_key(key)
+        # 同一组里不能有重复：小程序的 wx:for 用图片地址做 wx:key，
+        # 重复的 key 会让列表复用节点时错位
+        if len(set(v)) != len(v):
+            raise ValueError("同一组里有重复的图片")
         return v

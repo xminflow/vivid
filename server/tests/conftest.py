@@ -1,0 +1,22 @@
+"""全部测试共用的连接池开关。
+
+`app.db.pool` 是一个**模块级单例**，整个测试会话只有这一个。原先每个测试文件
+各自写了一份 session 级的 `db` fixture 去 open/close 它，跑单个文件时看不出问题，
+一次跑多个文件就会出事：pytest 在会话结束时按逆序 teardown，先轮到的那个文件把
+池 close 掉，还没 teardown 完的 fixture（比如 test_home_media 要把首页配图还原回去）
+再去 `pool.connection()` 就是 PoolClosed。
+
+所以开关只放这一处，且必须是最先建立的 session fixture——依赖它的 fixture 一定
+在它之后建立，也就一定在它之前 teardown，池还开着。
+"""
+
+import pytest
+
+from app.db import pool
+
+
+@pytest.fixture(scope="session", autouse=True)
+async def db():
+    await pool.open(wait=True, timeout=10)
+    yield
+    await pool.close()

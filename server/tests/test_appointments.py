@@ -40,13 +40,6 @@ async def client():
         await conn.execute("DELETE FROM appointments WHERE phone LIKE %s", (f"{TEST_PHONE_PREFIX}%",))
 
 
-@pytest.fixture(scope="session", autouse=True)
-async def db():
-    await pool.open(wait=True, timeout=10)
-    yield
-    await pool.close()
-
-
 async def test_health(client):
     r = await client.get("/health")
     assert r.status_code == 200
@@ -126,10 +119,4 @@ async def test_every_option_combination_is_accepted(client):
     assert n == 36
 
 
-async def test_list_returns_what_was_submitted(client):
-    await client.post("/api/appointments", json=form(phone="13550000004", name="列表校验"))
-    r = await client.get("/api/appointments")
-    assert r.status_code == 200
-    body = r.json()
-    assert body["ok"] is True
-    assert any(item["name"] == "列表校验" for item in body["items"])
+# 列表接口现在是后台的 GET /api/admin/appointments，覆盖在 test_admin.py

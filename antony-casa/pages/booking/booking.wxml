@@ -4,8 +4,7 @@
   <view class="hd">
     <text class="hd-title">预约参观</text>
     <text class="hd-en">Book a Visit</text>
-    <text class="hd-sub" wx:if="{{spaceName}}">{{spaceName}} · 杭州展厅</text>
-    <text class="hd-sub" wx:else>杭州展厅</text>
+    <text class="hd-sub">杭州展厅</text>
   </view>
 
   <view class="form">

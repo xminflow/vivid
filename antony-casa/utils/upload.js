@@ -35,10 +35,19 @@ function putBytes(url, buffer) {
       // 这个头没参与签名，COS 不校验它，随便给个二进制类型即可
       header: { 'Content-Type': 'application/octet-stream' },
       success: res => {
-        if (res.statusCode === 200) resolve()
-        else reject(new Error(`图片上传失败（${res.statusCode}）`))
+        if (res.statusCode === 200) return resolve()
+        // COS 拒绝时正文里有 <Code>/<Message>，说明是签名过期还是权限不对，
+        // 不打出来的话页面上只剩一个光秃秃的状态码
+        console.error('[upload] COS 拒绝了这次 PUT', res.statusCode, res.data)
+        reject(new Error(`图片上传失败（${res.statusCode}）`))
       },
-      fail: () => reject(new Error('网络异常，图片没传上去'))
+      fail: err => {
+        // 最常见的是 COS 域名没加进小程序后台的 request 合法域名——
+        // 微信会在 errMsg 里明说 "url not in domain list"，吞掉它就只剩一句
+        // 「网络异常」，根本没法定位。域名要求见本文件顶部的注释
+        console.error('[upload] PUT 发不出去', url.split('?')[0], err)
+        reject(new Error('网络异常，图片没传上去'))
+      }
     })
   })
 }
