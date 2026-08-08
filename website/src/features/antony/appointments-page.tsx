@@ -22,11 +22,12 @@ import { DetailField } from '@/components/detail-field'
 import { PaginationBar } from '@/components/pagination-bar'
 import { SelectFilter } from '@/components/select-filter'
 import { StatusBadge } from '@/components/status-badge'
+import { formatTime } from '@/lib/format'
 
 import { listAppointments } from './api'
 import { APPOINTMENT_STATUSES, PURPOSES, VISITOR_TYPES, statusMeta } from './constants'
 import type { Appointment, AppointmentQuery } from './types'
-import { formatTime, usePagedList } from './use-paged-list'
+import { usePagedList } from './use-paged-list'
 
 const BLANK: AppointmentQuery = {
   keyword: '',

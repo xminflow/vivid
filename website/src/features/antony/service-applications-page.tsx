@@ -22,6 +22,7 @@ import { DetailField } from '@/components/detail-field'
 import { PaginationBar } from '@/components/pagination-bar'
 import { SelectFilter } from '@/components/select-filter'
 import { StatusBadge } from '@/components/status-badge'
+import { formatTime } from '@/lib/format'
 
 import { listServiceApplications } from './api'
 import {
@@ -34,7 +35,7 @@ import {
   uploadLabel,
 } from './constants'
 import type { ServiceApplication, ServiceApplicationQuery } from './types'
-import { formatTime, usePagedList } from './use-paged-list'
+import { usePagedList } from './use-paged-list'
 
 const BLANK: ServiceApplicationQuery = {
   keyword: '',

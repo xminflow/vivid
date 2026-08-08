@@ -10,6 +10,7 @@ import { SessionProvider } from '@/features/auth/session-context'
 import { AppointmentsPage } from '@/features/antony/appointments-page'
 import { HomeMediaPage } from '@/features/antony/home-media-page'
 import { ServiceApplicationsPage } from '@/features/antony/service-applications-page'
+import { AccountsPage } from '@/features/accounts/accounts-page'
 
 import './index.css'
 
@@ -27,6 +28,8 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/antony/appointments" element={<AppointmentsPage />} />
               <Route path="/antony/service-applications" element={<ServiceApplicationsPage />} />
               <Route path="/antony/home-media" element={<HomeMediaPage />} />
+              {/* 只有超管进得去，普通管理员访问会吃服务端的 403 并在页面上报错 */}
+              <Route path="/accounts" element={<AccountsPage />} />
               {/* 打错地址不该白屏，回到默认页 */}
               <Route path="*" element={<Navigate to="/antony/appointments" replace />} />
             </Route>
