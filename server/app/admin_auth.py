@@ -40,12 +40,14 @@ if not SUPER_USERNAME or not SUPER_PASSWORD:
 try:
     SUPER_PASSWORD.encode("ascii")
 except UnicodeEncodeError:
-    # secrets.compare_digest 不支持非 ASCII 字符串比较，遇到就抛 TypeError，
-    # 且这行抛在登录失败计数之前——不受限流约束，还会被没接住的 500 暴露信息。
-    # 与其在登录路径上小心翼翼地绕开，不如直接不允许这种配置存在
+    # 密码现在统一走 verify_password（scrypt），对任意 Unicode 都能正确算，
+    # 这条校验不再是为了绕开某个函数的字符集限制。保留它是运维层面的考虑：
+    # 超管密码要在部署环境里手敲/粘贴进配置文件，全角符号、不可见字符这类
+    # 非 ASCII 字符很容易在不同终端/编辑器之间跑丢或跑样却查不出来，
+    # 与其让超管某天莫名其妙登不进去，不如启动期直接报错逼着换成 ASCII
     raise RuntimeError(
-        "ADMIN_SUPER_PASSWORD 只能用 ASCII 字符：secrets.compare_digest 不支持"
-        "非 ASCII 字符串的常量时间比较，配置里混进中文等字符会让超管永远登录失败"
+        "ADMIN_SUPER_PASSWORD 只能用 ASCII 字符：避免配置文件在不同环境间"
+        "传递时混进全角符号、不可见字符等不容易排查的问题"
     ) from None
 
 # 登录态有效期。比小程序那边的 30 天短得多：后台一屏就是全量客户手机号，
@@ -62,6 +64,15 @@ LOCKOUT = timedelta(minutes=15)
 # 的 CPU 代价——不这么做，「不存在」和「存在但密码错」的响应耗时会差出
 # scrypt 那几十毫秒（见 security.py），足够当用户名探测的计时侧信道
 _DUMMY_PASSWORD_HASH = hash_password(secrets.token_urlsafe(32))
+
+# 超管密码本来是配置文件里的明文，比对时却不直接和明文做 compare_digest：
+# 那样超管这条路径只有「一次常量时间比较」，比普通管理员那条「一次 SELECT +
+# 一次 scrypt」快得多，快慢本身就成了「这是不是超管用户名」的计时侧信道——
+# 跟 I2 挡的用户名枚举是同一类问题，只是从状态码通道换到了耗时通道。
+# 把配置密码也预先算成哈希、登录时同样走一次 verify_password，
+# 三条路径（超管 / 真实管理员 / 不存在的用户名）就都是「1 次 SELECT + 1 次
+# scrypt」，没有谁能抢跑。别嫌多此一举把这个哈希删掉、改回明文比较
+_SUPER_PASSWORD_HASH = hash_password(SUPER_PASSWORD)
 
 router = APIRouter(prefix="/api/admin/auth", tags=["admin-auth"])
 
@@ -212,21 +223,21 @@ async def login(body: AdminLoginIn) -> dict:
 
             admin_id: int | None = None
             is_super = username == SUPER_USERNAME
+
+            # 不管是不是超管都先查一次 admin_users——超管本来就不在这张表里，
+            # 这里必然查不到，但每一条路径都要付这一次 SELECT 往返，否则
+            # 「查不查库」本身就会在超管和别的用户名之间制造耗时差，
+            # 被人拿去反推超管用户名（跟下面 verify_password 要防的是同一类问题）
+            row = await (
+                await conn.execute(
+                    "SELECT id, password_hash, status FROM admin_users WHERE username = %s",
+                    (username,),
+                )
+            ).fetchone()
+
             if is_super:
-                # 配置里的密码是明文，常量时间比对，别用 ==。
-                # 两边都先 encode 成 bytes：compare_digest 不支持 str 里带非 ASCII
-                # 字符（会直接抛 TypeError），SUPER_PASSWORD 已在模块加载时校验过
-                # 只含 ASCII，但 body.password 是用户输入，什么字符都可能有，
-                # 所以这里用 utf-8 encode 而不是 ascii encode——目的只是拿到
-                # bytes 给 compare_digest，不是要求用户密码也是 ASCII
-                ok = secrets.compare_digest(body.password.encode(), SUPER_PASSWORD.encode())
+                ok = verify_password(body.password, _SUPER_PASSWORD_HASH)
             else:
-                row = await (
-                    await conn.execute(
-                        "SELECT id, password_hash, status FROM admin_users WHERE username = %s",
-                        (username,),
-                    )
-                ).fetchone()
                 # row 为 None（用户名不存在）时也要跑一遍 verify_password，用假哈希
                 # 垫上同样的 scrypt 耗时——`and` 短路会让「不存在」比「存在但密码错」
                 # 快一个数量级，那个时间差本身就是一个免费的用户名探测 oracle。

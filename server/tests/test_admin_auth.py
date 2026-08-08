@@ -65,9 +65,10 @@ async def test_super_admin_logs_in_with_configured_credentials(client):
 
 
 async def test_non_ascii_password_against_super_username_is_401_not_500(client):
-    # secrets.compare_digest 对带非 ASCII 字符的 str 会抛 TypeError；这行是回归测试，
-    # 确认那条路径已经改成先 encode 成 bytes 再比，不会在限流之前就裸奔出一个 500
-    # （500 和 401 的区别本身就能让人一次请求判断出这就是超管用户名）
+    # 早期实现用 secrets.compare_digest 直接比对超管密码明文，带非 ASCII 字符的
+    # 密码会让它抛 TypeError、裸奔成 500（500 和 401 的区别本身就能让人一次请求
+    # 判断出这就是超管用户名）。现在密码统一走 verify_password（scrypt，对任意
+    # Unicode 都能正确算），这行留作回归测试，确认这条路径不会再裸奔出 500
     r = await login(client, SUPER_USERNAME, "密码不对但是中文")
     assert r.status_code == 401, r.text
 
