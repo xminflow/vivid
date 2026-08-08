@@ -1,0 +1,23 @@
+# 仓库全局开着 core.autocrlf=true（Windows checkout 用 CRLF），但下面这批文件
+# 会被部署链路里的 Linux/WSL 侧程序直接读取——deploy.sh 是在 WSL 里当 bash 脚本
+# 跑的（`wsl -d Ubuntu -- bash /mnt/d/code/vivid/server/deploy/deploy.sh`，
+# 直接读 Windows 工作区里的文件，中间没有任何转换步骤）。
+#
+# 如果不锁定这些文件的换行符，重新 clone 一份仓库时 autocrlf 会把它们签出成
+# CRLF：bash 遇到脚本行尾的 \r 会报出一堆和换行符毫无关系的怪异错误（比如
+# `$'\r': command not found` 或紧跟在 shebang 后面的语法错误），排查起来很容易
+# 走偏；Dockerfile / docker-compose.yml 里 CRLF 也可能让某些解析器出错或产生
+# 幽灵差异；.dockerignore 每行是逐字匹配的忽略规则，行尾多一个 \r 会让整条
+# 规则失效但不会报错，本身就很难发现。
+#
+# 所以这里只钉死「明确会被 Linux 侧程序读取」的这一批文件为 LF，不对全仓库
+# 做 `* text=auto`：那会让本来不相关的文件在下次改动时产生一堆无关的换行符
+# diff。
+
+*.sh            text eol=lf
+Dockerfile      text eol=lf
+Caddyfile       text eol=lf
+docker-compose.yml text eol=lf
+.dockerignore   text eol=lf
+.env.example    text eol=lf
+schema.sql      text eol=lf

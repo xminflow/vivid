@@ -334,8 +334,30 @@ git checkout <旧 commit>
 wsl -d Ubuntu -- bash .../deploy.sh --skip-web
 ```
 
-配置文件（compose / Caddyfile）改坏了可以只回滚文件：改回本地版本，
-`deploy.sh --skip-build --skip-web` 同步上去即可。
+配置文件（compose / Caddyfile）改坏了可以只回滚文件：改回本地版本后直接
+scp + ssh 生效，**不要调 `deploy.sh`**，哪怕加 `--skip-build --skip-web`。
+原因同上面「建三张表」一节的提示框：这两个开关不阻止 `[5/8]` 换镜像和
+`[8/8]` 换容器，本地 `antony-casa-api:latest` 在这个时间点几乎必然已经是
+新代码——回滚本来是最不该出意外的时刻，结果连带把 api 也换了。
+
+```bash
+# Caddyfile 改坏了：改回本地版本后
+scp /mnt/d/code/vivid/server/deploy/Caddyfile \
+    deploy@antonycasa.weelume.com:/home/deploy/workspace/antony-casa/Caddyfile
+ssh deploy@antonycasa.weelume.com \
+  'cd /home/deploy/workspace/antony-casa && \
+   docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile'
+
+# docker-compose.yml 改坏了：改回本地版本后
+scp /mnt/d/code/vivid/server/deploy/docker-compose.yml \
+    deploy@antonycasa.weelume.com:/home/deploy/workspace/antony-casa/docker-compose.yml
+ssh deploy@antonycasa.weelume.com \
+  'cd /home/deploy/workspace/antony-casa && docker compose up -d --remove-orphans'
+```
+
+`docker-compose.yml` 里 api 是 `pull_policy: never`，`up -d` 只会用远端已经
+`docker load` 过的镜像重建容器、不会去拉取或用到本地 Windows 侧的镜像，
+所以这条命令只应用配置改动，镜像不变。
 
 ## 已知遗留
 
