@@ -24,7 +24,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 # 所以下面的 os.getenv 一定拿得到值。别把这个 import 挪到 getenv 后面
 from .db import pool
 from .models import AdminLoginIn, AdminPasswordChangeIn
-from .security import verify_password
+from .security import hash_password, verify_password
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +37,16 @@ if not SUPER_USERNAME or not SUPER_PASSWORD:
         "缺少 ADMIN_SUPER_USERNAME 或 ADMIN_SUPER_PASSWORD："
         "把 .env.example 里管理后台那两项复制到 .env 并填上"
     )
+try:
+    SUPER_PASSWORD.encode("ascii")
+except UnicodeEncodeError:
+    # secrets.compare_digest 不支持非 ASCII 字符串比较，遇到就抛 TypeError，
+    # 且这行抛在登录失败计数之前——不受限流约束，还会被没接住的 500 暴露信息。
+    # 与其在登录路径上小心翼翼地绕开，不如直接不允许这种配置存在
+    raise RuntimeError(
+        "ADMIN_SUPER_PASSWORD 只能用 ASCII 字符：secrets.compare_digest 不支持"
+        "非 ASCII 字符串的常量时间比较，配置里混进中文等字符会让超管永远登录失败"
+    ) from None
 
 # 登录态有效期。比小程序那边的 30 天短得多：后台一屏就是全量客户手机号，
 # 一台没锁屏的电脑不该一个月都是登录状态
@@ -46,6 +56,12 @@ TOKEN_TTL = timedelta(hours=12)
 # 锁 IP 会让同一个办公室的运营互相牵连
 MAX_FAILURES = 5
 LOCKOUT = timedelta(minutes=15)
+
+# 用户名不存在时拿来垫时间的假哈希，见 login() 里的用法。
+# 内容本身没有意义（甚至用不到明文），只是让「查无此人」也要付一次 scrypt
+# 的 CPU 代价——不这么做，「不存在」和「存在但密码错」的响应耗时会差出
+# scrypt 那几十毫秒（见 security.py），足够当用户名探测的计时侧信道
+_DUMMY_PASSWORD_HASH = hash_password(secrets.token_urlsafe(32))
 
 router = APIRouter(prefix="/api/admin/auth", tags=["admin-auth"])
 
@@ -130,29 +146,45 @@ async def _attempts(conn, username: str) -> dict | None:
     ).fetchone()
 
 
-async def _record_failure(conn, username: str, prior: dict | None) -> None:
+async def _record_failure(conn, username: str) -> None:
     """失败计数 +1，到阈值就锁一段时间。
 
-    锁过期后从 1 重新数，不接着上次往上加：一个人今天错 4 次、下周再错 1 次
-    就被锁，那不是爆破的特征，只是记性不好。
-    """
-    expired = (
-        prior is not None
-        and prior["locked_until"] is not None
-        and prior["locked_until"] <= _now()
-    )
-    count = 1 if (prior is None or expired) else prior["fail_count"] + 1
-    locked_until = _now() + LOCKOUT if count >= MAX_FAILURES else None
+    递增和判断阈值整句下沉到这一条 SQL 里算，不在 Python 里「读出来 -> 算 ->
+    写回去」：并发的两次失败请求会都读到同一个旧值，各自 +1 写回，计数总共
+    只前进 1 次而不是 2 次——攻击者只要把请求并发发出去，就能把锁定阈值按
+    并发数放大，限流形同虚设。`INSERT ... ON CONFLICT DO UPDATE` 会给冲突行
+    加锁，并发请求在这条语句上自然排队，不会看到彼此的中间状态。
 
+    锁过期后从 1 重新数，不接着上次往上加：一个人今天错 4 次、下周再错 1 次
+    就被锁，那不是爆破的特征，只是记性不好——下面的 CASE 就是干这个的。
+    """
     await conn.execute(
         """
         INSERT INTO admin_login_attempts (username, fail_count, locked_until)
-        VALUES (%s, %s, %s)
+        VALUES (%s, 1, NULL)
         ON CONFLICT (username) DO UPDATE SET
-          fail_count   = EXCLUDED.fail_count,
-          locked_until = EXCLUDED.locked_until
+          fail_count = CASE
+            WHEN admin_login_attempts.locked_until IS NOT NULL
+             AND admin_login_attempts.locked_until <= now()
+            THEN 1
+            ELSE admin_login_attempts.fail_count + 1
+          END,
+          -- 这里没法直接引用上面刚算出来的 fail_count（同一条 UPDATE 的
+          -- SET 列表里互相看不到彼此的新值），只能把同一个 CASE 再写一遍
+          locked_until = CASE
+            WHEN (
+              CASE
+                WHEN admin_login_attempts.locked_until IS NOT NULL
+                 AND admin_login_attempts.locked_until <= now()
+                THEN 1
+                ELSE admin_login_attempts.fail_count + 1
+              END
+            ) >= %s
+            THEN now() + %s
+            ELSE NULL
+          END
         """,
-        (username, count, locked_until),
+        (username, MAX_FAILURES, LOCKOUT),
     )
 
 
@@ -181,8 +213,13 @@ async def login(body: AdminLoginIn) -> dict:
             admin_id: int | None = None
             is_super = username == SUPER_USERNAME
             if is_super:
-                # 配置里的密码是明文，常量时间比对，别用 ==
-                ok = secrets.compare_digest(body.password, SUPER_PASSWORD)
+                # 配置里的密码是明文，常量时间比对，别用 ==。
+                # 两边都先 encode 成 bytes：compare_digest 不支持 str 里带非 ASCII
+                # 字符（会直接抛 TypeError），SUPER_PASSWORD 已在模块加载时校验过
+                # 只含 ASCII，但 body.password 是用户输入，什么字符都可能有，
+                # 所以这里用 utf-8 encode 而不是 ascii encode——目的只是拿到
+                # bytes 给 compare_digest，不是要求用户密码也是 ASCII
+                ok = secrets.compare_digest(body.password.encode(), SUPER_PASSWORD.encode())
             else:
                 row = await (
                     await conn.execute(
@@ -190,18 +227,24 @@ async def login(body: AdminLoginIn) -> dict:
                         (username,),
                     )
                 ).fetchone()
-                ok = row is not None and verify_password(body.password, row["password_hash"])
-                if ok and row["status"] != "active":
+                # row 为 None（用户名不存在）时也要跑一遍 verify_password，用假哈希
+                # 垫上同样的 scrypt 耗时——`and` 短路会让「不存在」比「存在但密码错」
+                # 快一个数量级，那个时间差本身就是一个免费的用户名探测 oracle。
+                # 这行不是多余代码，看着像 dead code 但删了就是开了个计时侧信道
+                ok = verify_password(
+                    body.password, row["password_hash"] if row else _DUMMY_PASSWORD_HASH
+                )
+                if row is not None and ok and row["status"] != "active":
                     # 密码是对的，只是号被停了。这条不算失败计数——
                     # 本人反复试自己的密码不是爆破
                     raise HTTPException(
                         status.HTTP_403_FORBIDDEN, "账号已被停用，请联系超级管理员"
                     )
-                if ok:
+                if row is not None and ok:
                     admin_id = row["id"]
 
             if not ok:
-                await _record_failure(conn, username, prior)
+                await _record_failure(conn, username)
                 # 显式提交：接下来这行 raise 会让 `async with pool.connection()`
                 # 带着异常退出，psycopg 遇到异常退出会回滚整个事务——不提前提交，
                 # 刚记的这次失败次数会被回滚掉，锁定机制形同虚设
@@ -284,10 +327,6 @@ async def change_password(
             status.HTTP_400_BAD_REQUEST,
             "超级管理员的密码在服务器配置文件里维护，改完需要重启服务",
         )
-
-    # 循环导入：admin_accounts 会 import 本模块的依赖，本模块只在这里用一次
-    # hash_password，直接从 security 拿即可，不必绕 admin_accounts
-    from .security import hash_password
 
     async with pool.connection() as conn:
         row = await (
