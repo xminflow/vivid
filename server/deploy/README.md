@@ -92,20 +92,37 @@ ADMIN_SUPER_PASSWORD=<强密码>
 ### ② 建三张表
 
 `schema.sql` 只在**首次建库**时自动执行，`deploy.sh` 把它 scp 上去但**不执行**。
-`admin_users` / `admin_sessions` / `admin_login_attempts` 这三张表要手动建：
+`admin_users` / `admin_sessions` / `admin_login_attempts` 这三张表要手动建。
+
+> ⚠️ **这一步不要调 `deploy.sh`**，哪怕加了 `--skip-build --skip-web`。
+> 这两个开关**不阻止换容器**：`--skip-build` 只跳过 `[4/8]` 的 `docker build`，
+> `--skip-web` 只跳过 `[7/8]` 的前端同步；`[5/8]` 上传镜像 + `docker load` 和
+> `[8/8]` 的 `up -d --remove-orphans` 照常执行。本地的 `antony-casa-api:latest`
+> 在这个流程里几乎必然已经是新代码，于是**表还没建、前端还是旧的，新后端就上线了**
+> ——正好同时命中下面两种故障。而且 `--skip-web` 会跳过静态站点校验、`/health`
+> 又不碰 admin 表，脚本会安安静静地报成功，没人会察觉容器已经被换掉。
+
+直接 scp 文件 + ssh 跑 psql，全程不碰 api 容器：
 
 ```bash
-# 先同步一次文件（不换容器）
-wsl -d Ubuntu -- bash /mnt/d/code/vivid/server/deploy/deploy.sh --skip-build --skip-web
+# 1. 只把 schema.sql 传上去（在 WSL 里跑；这条命令不会启动或替换任何容器）
+scp /mnt/d/code/vivid/server/schema.sql \
+    deploy@antonycasa.weelume.com:/home/deploy/workspace/antony-casa/schema.sql
 
+# 2. 在服务器上执行它。ON_ERROR_STOP=1 让任何一条语句出错就整体失败，
+#    不要出现「前半截建了、后半截没建」还返回成功的情况
 ssh deploy@antonycasa.weelume.com
 cd /home/deploy/workspace/antony-casa && source .env
-docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" < schema.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 \
+  -U "$POSTGRES_USER" -d "$POSTGRES_DB" < schema.sql
 
-# 核对三张表都在
-docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  -c "\dt admin_*"
+# 3. 核对三张表都在（应当列出 admin_login_attempts / admin_sessions / admin_users）
+docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c '\dt admin_*'
 ```
+
+`schema.sql` 全是 `IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`，对已有的库重复执行
+是安全的。`docker compose exec` 要求 postgres 容器正在跑——它是常驻的；万一没跑，
+用 `docker compose up -d postgres` 单独把它拉起来，这样也不会动到 api。
 
 漏了会怎样：新代码起来后每一条 `/api/admin/*` 和登录接口都 500
 （`relation "admin_sessions" does not exist`）。
@@ -175,8 +192,11 @@ docker compose logs -f api                 # 只看后端
 之后改表要手动跑：
 
 ```bash
-# 本地改完 schema.sql，重新部署一次把文件同步上去（up -d 不会重跑 initdb）
-wsl -d Ubuntu -- bash .../deploy.sh --skip-build --skip-web
+# 本地改完 schema.sql，把文件传上去。只 scp，不调 deploy.sh——
+# --skip-build / --skip-web 都**不阻止换容器**（见上面「发布」一节那个提示框），
+# 而建表必须发生在新代码上线之前
+scp /mnt/d/code/vivid/server/schema.sql \
+    deploy@antonycasa.weelume.com:/home/deploy/workspace/antony-casa/schema.sql
 
 ssh deploy@antonycasa.weelume.com
 cd /home/deploy/workspace/antony-casa

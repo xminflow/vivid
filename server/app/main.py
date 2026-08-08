@@ -1,8 +1,6 @@
 """小程序接口：展厅预约登记、服务申请、COS 图片直传地址签发。"""
 
-import asyncio
 import logging
-import sys
 from contextlib import asynccontextmanager
 
 import psycopg
@@ -24,13 +22,12 @@ from .models import AppointmentIn, ServiceApplicationIn, UploadUrlIn
 from .users import current_user_or_none
 from .users import router as users_router
 
-# Windows 上 asyncio 默认用 ProactorEventLoop，psycopg 的异步模式不认它
-# （它没有 socket 的 add_reader）。直接 `uvicorn app.main:app` 起本机服务时，
-# 症状是每个请求都 PoolTimeout，看着像连不上库，实际是事件循环选错了。
-# 必须在 uvicorn 建循环之前设好，所以放在模块导入期而不是 lifespan 里。
-# 线上跑在 Linux 容器里，这段是空操作（tests/conftest.py 里有同样的一段）
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+# 这里**不要**加 asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())。
+# 试过，无效：uvicorn 0.36 起改用 Config.get_loop_factory() + asyncio.Runner，
+# 不再读 policy；而且 import 本模块时循环已经建好了。原生 Windows 上起本地服务
+# 请用 scripts/dev_server.py，那里解释了完整原因。
+# 测试侧走 anyio/pytest-asyncio，那条路径确实认 policy，所以 tests/conftest.py
+# 里那一份是有效的，不要照着它在这里也来一份
 
 # 在建 app 之前配好，业务模块之后打的日志才有格式、INFO 才出得来
 setup_logging()

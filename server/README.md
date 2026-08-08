@@ -34,7 +34,7 @@ cp .env.example .env
 ## 起服务
 
 ```bash
-# 在 WSL 中
+# 在 WSL 中（推荐，也是线上容器的跑法）
 cd /mnt/d/code/vivid/server
 uv sync
 uv run uvicorn app.main:app --host 0.0.0.0 --port 3000
@@ -43,6 +43,26 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 3000
 开发时加 `--reload` 改代码自动重启。
 
 Windows 侧（微信开发者工具所在环境）直接访问 `http://127.0.0.1:3000`，WSL2 会自动转发。
+
+### 原生 Windows（不进 WSL）
+
+**不能直接用 `uvicorn app.main:app`**，要走这个脚本：
+
+```powershell
+cd D:\code\vivid\server
+uv run python scripts/dev_server.py
+```
+
+原因：psycopg 的异步模式要求事件循环支持 `add_reader`，Windows 默认的
+`ProactorEventLoop` 没有。直接用 uvicorn 起的话，启动就会
+`PoolTimeout: pool initialization incomplete after 10 sec` + `Application startup failed`，
+看着像连不上库，实际是循环选错了。而 uvicorn 从 0.36 起不再读 asyncio 的
+event loop policy（改成了 `Config.get_loop_factory()`），所以在 `app/main.py` 里
+`set_event_loop_policy` 是没用的——只能像 `scripts/dev_server.py` 那样自己建好
+循环再把 uvicorn 跑进去。细节见那个脚本的 docstring。
+
+该脚本不支持 `--reload`（reload 的活干在 uvicorn spawn 的子进程里，绕不过去）。
+要 reload 就回 WSL。
 
 端口 3000 是全链路统一的：本地 uvicorn、容器内监听（`Dockerfile` 的 `PORT`）、
 小程序 `utils/config.js` 的 `API_BASE` 都用它，容器部署时宿主机也映射成 `-p 3000:3000`。

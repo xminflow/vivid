@@ -4,6 +4,7 @@
 不能用 TRUNCATE。
 """
 
+import hashlib
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -485,3 +486,63 @@ async def test_account_list_shows_created_accounts(client):
     assert r.status_code == 200, r.text
     names = [a["username"] for a in r.json()["items"]]
     assert "test.alice" in names
+
+
+# ---------------------------------------------------------------------------
+# 登录路径的耗时等价（防用户名枚举的计时侧信道）
+
+
+async def _scrypt_calls(monkeypatch, client, username, password):
+    """数这一次登录请求里 hashlib.scrypt 真正被调用了几次。
+
+    打的是 `hashlib.scrypt` 本体而不是 `verify_password`：前者是真正花掉那几十
+    毫秒的地方，任何「被短路成 0 次」或「不小心跑了 2 次」都逃不掉；换成打
+    verify_password 的话，将来若有人在里面加一层缓存或提前 return，计数照样是 1。
+    """
+    n = 0
+    real = hashlib.scrypt
+
+    def counting(*args, **kwargs):
+        nonlocal n
+        n += 1
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(hashlib, "scrypt", counting)
+    try:
+        r = await login(client, username, password)
+    finally:
+        monkeypatch.setattr(hashlib, "scrypt", real)
+    return n, r
+
+
+async def test_every_login_path_runs_exactly_one_scrypt(client, monkeypatch):
+    """每条登录路径都恰好跑一次 scrypt，一次不多一次不少。
+
+    这是 admin_auth.py 里两处「看着像多余代码」的存在理由，守的是同一件事：
+    三条路径（超管 / 真实管理员 / 不存在的用户名）耗时必须没有可测的差别，
+    否则响应快慢本身就是个免费的用户名探测 oracle，能被用来反推出超管用户名——
+    而超管用户名一旦泄漏，就能被恶意反复锁定（见 deploy/README.md）。
+
+    那两处分别是：`_DUMMY_PASSWORD_HASH`（用户名不存在时垫一次 scrypt，不能让
+    `and` 短路把它省掉）和 `_SUPER_PASSWORD_HASH`（超管的配置明文也预先哈希，
+    不走 compare_digest，否则超管那条路径会比别的快一个数量级）。
+
+    这条断言此前只在改动时人工核过一次，没有留在库里；它已经被改坏过两轮，
+    值得有个自动回归盯着——尤其是 scrypt 现在被挪进了 anyio 线程池，
+    调用点的写法变了，更容易在下次重构里被无意中改成两次或零次。
+    """
+    headers = await super_headers(client)
+    await make_account(client, headers)
+
+    # 顺序有意为之：先成功登一次超管把失败计数清零，后面那两次失败加起来
+    # 也远够不到 MAX_FAILURES=5，不会有哪条用例被 429 顶掉
+    cases = [
+        ("超管 / 密码正确", SUPER_USERNAME, SUPER_PASSWORD, 200),
+        ("超管 / 密码错误", SUPER_USERNAME, "definitely-not-it", 401),
+        ("普通管理员 / 密码正确", "test.alice", "alice-pass-1", 200),
+        ("用户名不存在", "test.nobody", "definitely-not-it", 401),
+    ]
+    for label, username, password, expected in cases:
+        n, r = await _scrypt_calls(monkeypatch, client, username, password)
+        assert r.status_code == expected, f"{label}: {r.status_code} {r.text}"
+        assert n == 1, f"{label}: scrypt 跑了 {n} 次，应当恰好 1 次"
