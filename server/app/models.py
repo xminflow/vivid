@@ -7,6 +7,8 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 from pydantic.alias_generators import to_camel
 
+from .security import PASSWORD_MAX_LEN, PASSWORD_MIN_LEN
+
 VISITOR_TYPES = ("业主", "设计师", "地产圈", "家居圈", "酒店民宿圈", "艺术圈")
 PURPOSES = ("展厅参观", "全案设计咨询", "装修建材订购", "家具软装选购", "商务合作", "其他")
 # 与小程序 mock/mine.js 的 genders 一致，多一个 '' 表示没填
@@ -246,8 +248,9 @@ class HomeMediaIn(BaseModel):
 ADMIN_USERNAME_PATTERN = r"^[a-zA-Z0-9_.-]{3,32}$"
 
 AdminUsername = Annotated[Trimmed, Field(pattern=ADMIN_USERNAME_PATTERN)]
-# 长度上下限见 app/security.py，那里解释了为什么不强制字符组合
-AdminPassword = Annotated[str, Field(min_length=8, max_length=64)]
+# 长度上下限直接引用 app/security.py 的常量，不再抄一份字面量：
+# 那里解释了为什么不强制字符组合，两处各写一份数字迟早会改一处漏一处
+AdminPassword = Annotated[str, Field(min_length=PASSWORD_MIN_LEN, max_length=PASSWORD_MAX_LEN)]
 
 
 class AdminLoginIn(BaseModel):

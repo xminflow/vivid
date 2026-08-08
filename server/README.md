@@ -102,6 +102,33 @@ with psycopg.connect(DATABASE_URL) as c:
 `POST /api/admin/auth/login` 换来，登录与账号管理见 `app/admin_auth.py` 和
 `app/admin_accounts.py`，运维说明见下面「上线前要做的」。
 
+### 吊销登录态
+
+会话是库里的一行（`admin_sessions`），有效期 12 小时、每次使用滑动续期，
+但从签发起满 7 天绝对失效（`MAX_LIFETIME`）。
+
+普通管理员有三条现成的吊销路径，全部在后台点得出来：改密码会删掉这个人在别处的
+会话、停用账号会删掉它的全部会话、删号靠外键级联删会话。
+
+**超管一条都没有**——它不入库，没有任何账号操作会牵连到它的会话，改配置重启也不清
+（会话在库里，不在内存）。所以超管 token 一旦泄漏（截图、日志、共用电脑），
+在它自己过期前只能手动删表行：
+
+```sql
+-- 吊销超管的全部登录态，下一次请求立刻 401
+DELETE FROM admin_sessions WHERE is_super;
+
+-- 只吊销某一条（知道具体 token 时，比如从日志里认出来的那条）
+DELETE FROM admin_sessions WHERE token = '<token>';
+
+-- 顺带看一眼现在有哪些超管会话、什么时候签发的
+SELECT token, created_at, expires_at FROM admin_sessions WHERE is_super ORDER BY created_at;
+```
+
+生产库怎么连见 [`deploy/README.md`](deploy/README.md) 的「连库」。
+删完最好再把 `.env` 里的 `ADMIN_SUPER_PASSWORD` 换一个并重启 api，
+否则泄漏的如果是密码而不只是 token，删会话只是治标。
+
 FastAPI 自带文档在 `/docs`。
 
 POST 请求体（小程序传驼峰，模型两边都收）：
@@ -294,11 +321,17 @@ bash deploy/deploy.sh --skip-web   # 只更新后端
   **只差最后一步**：小程序后台「开发管理 - 开发设置 - 服务器域名」把它加进 request 合法域名
 - ~~后台接口 `/api/admin/*` 没有鉴权~~ 已完成：需要登录才能访问。
   超级管理员由 `.env` 的 `ADMIN_SUPER_USERNAME` / `ADMIN_SUPER_PASSWORD` 指定，
-  **上线前务必换成强密码**。其余管理员账号由超管登录后台后在「账号管理」页创建，
+  **上线前务必换成强密码，用户名也要一起换掉**——`.env.example` 里那个是占位符，
+  别用 `root` / `admin` 这类能猜到的名字：失败计数锁的是用户名，对着一个已知的
+  用户名每 15 分钟发 5 个错密码就能把超管永久锁死，而超管是唯一能建号、重置密码、
+  启停账号的角色。其余管理员账号由超管登录后台后在「账号管理」页创建，
   系统没有注册入口。
 
   超管的密码在配置里，系统内改不了——改密码 = 改 `.env` + 重启服务。
   换来的是超管既停用不了也删不掉，后台不会被锁死在门外。
+
+  超管被锁 / token 泄漏的处置 SQL 见 [`deploy/README.md`](deploy/README.md)
+  「超管被锁住了 / token 泄漏了」一节。
 - CORS 现在是 `allow_origins=["*"]`。登录态走 `Authorization` 头不走 cookie，
   `*` 不构成漏洞，但上线时仍应收窄到后台的具体域名。
 - **把 COS 桶权限收成「私有读写」**——实测当前开发桶是「公有读私有写」，对象键虽然是 uuid

@@ -11,7 +11,10 @@ export function RequireAuth() {
   // 已经登录的人每次刷新都看见闪一下，像是登录态不稳
   if (!ready) return null
 
-  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  // 带上 search：像 /appointments?page=3&status=pending 这种，只记 pathname 的话
+  // 登录完回去的是第一页，筛选条件全丢了
+  if (!user)
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
 
   return <Outlet />
 }

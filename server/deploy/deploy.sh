@@ -92,6 +92,47 @@ if [[ "$SKIP_WEB" != "true" ]]; then
   done
 fi
 ssh_cmd "true" || { echo "SSH 连不上 $DEPLOY_HOST" >&2; exit 1; }
+
+# 超管账号必须能进到容器里，而且必须在动手之前就查出来。
+#
+# Dockerfile 只 COPY 了 app/，容器里没有 .env 文件，ADMIN_SUPER_USERNAME /
+# ADMIN_SUPER_PASSWORD 只能经 docker-compose.yml 的 environment 从远端 .env 进去。
+# 少任何一项，app/admin_auth.py 在**模块导入期**就 raise——不是启动后报错，是
+# import app.main 直接炸，容器起不来、restart: unless-stopped 无限重启。
+# 而 Caddyfile 的 (shared) 片段把两个域名的 /api/* 都反代到同一个 api 服务，
+# 所以那不只是后台挂，是官网预约、服务申请、小程序接口一起挂。
+# 等到第 8 步 up -d 之后才发现就晚了：那时旧容器已经被替换掉，现网是整体不可用
+step_env_file="$REMOTE_DIR/.env"
+missing_keys=""
+if ssh_cmd "test -f '$REMOTE_DIR/.env'"; then
+  for key in ADMIN_SUPER_USERNAME ADMIN_SUPER_PASSWORD; do
+    ssh_cmd "grep -Eq '^[[:space:]]*$key=[^[:space:]]' '$REMOTE_DIR/.env'" \
+      || missing_keys="$missing_keys $key"
+  done
+else
+  # 远端还没有 .env，第 6 步会用本地 server/.env 生成一份，所以查的是本地这份
+  step_env_file="$SERVER_DIR/.env"
+  for key in ADMIN_SUPER_USERNAME ADMIN_SUPER_PASSWORD; do
+    grep -Eq "^[[:space:]]*$key=[^[:space:]]" "$SERVER_DIR/.env" 2>/dev/null \
+      || missing_keys="$missing_keys $key"
+  done
+fi
+if [[ -n "$missing_keys" ]]; then
+  echo "$step_env_file 缺少（或值为空）:$missing_keys" >&2
+  echo "" >&2
+  echo "这两项是后台超级管理员的账号密码，容器只能从这里拿到它们。" >&2
+  echo "缺了的话 API 容器起不来并无限重启，官网预约、小程序接口、后台会一起挂。" >&2
+  echo "" >&2
+  echo "补上再重跑（用户名别用 root / admin 这类能猜到的名字，密码要强且只能用 ASCII）：" >&2
+  if [[ "$step_env_file" == "$REMOTE_DIR/.env" ]]; then
+    echo "  ssh $DEPLOY_HOST" >&2
+    echo "  vi $REMOTE_DIR/.env      # 追加 ADMIN_SUPER_USERNAME= 与 ADMIN_SUPER_PASSWORD=" >&2
+  else
+    echo "  编辑 $SERVER_DIR/.env，格式见 $SERVER_DIR/.env.example 最后一节" >&2
+  fi
+  exit 1
+fi
+
 echo "    OK"
 
 # ------------------------------------------------------- 远端目录与 compose
@@ -202,6 +243,17 @@ COS_SECRET_ID=${COS_SECRET_ID:-}
 COS_SECRET_KEY=${COS_SECRET_KEY:-}
 COS_BUCKET=${COS_BUCKET:-}
 COS_REGION=${COS_REGION:-ap-shanghai}
+
+# 管理后台的超级管理员。这一个账号定义在配置里、不入库，是后台唯一的初始钥匙，
+# 其余管理员由它登录后在「账号管理」页创建。两项缺一 API 容器直接起不来
+# （而两个域名的 /api/* 都打到这个容器，等于官网和小程序也一起挂）。
+#
+# ⚠️ 用户名也必须换掉，不要用 root / admin 这类一猜就中的名字：用户名一旦被知道，
+#    对着它连发 5 次错密码就能把超管锁 15 分钟，每 15 分钟发一轮就是永久锁死，
+#    而超管是唯一能建号、重置密码、启停账号的角色。密码要强，且只能用 ASCII 字符。
+# 改这两项 = 改本文件 + docker compose up -d api（超管在系统内改不了自己的密码）
+ADMIN_SUPER_USERNAME=${ADMIN_SUPER_USERNAME:-}
+ADMIN_SUPER_PASSWORD=${ADMIN_SUPER_PASSWORD:-}
 EOF
 )"
   # 经 stdin 写入，避免密钥出现在远端的进程命令行里（ps 能看到）

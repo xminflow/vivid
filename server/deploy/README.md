@@ -56,6 +56,93 @@ wsl -d Ubuntu -- bash /mnt/d/code/vivid/server/deploy/deploy.sh
 第 7 步的 reload 不能省：Caddyfile 是 bind mount 进容器的，改了内容 compose
 认为服务定义没变、容器不重建，Caddy 自己也不会重读，不显式 reload 配置就永远不生效。
 
+## 发布「管理端登录鉴权」这一支
+
+这一支同时改了配置、表结构和前后端契约，**顺序错了会有肉眼可见的故障**，
+按下面四步走，不要跳、不要拆成两次发。
+
+### ① 远端 `.env` 补上超管两项
+
+```bash
+ssh deploy@antonycasa.weelume.com
+cd /home/deploy/workspace/antony-casa
+vi .env
+```
+
+追加（用户名**不要**用 `root` / `admin` 这类能猜到的名字，见下面「超管被锁住了」；
+密码要强，且只能用 ASCII 字符）：
+
+```
+ADMIN_SUPER_USERNAME=<不容易猜的用户名>
+ADMIN_SUPER_PASSWORD=<强密码>
+```
+
+远端 `.env` 是首次部署时生成的，之后 `deploy.sh` 只会「已存在就保留不动」，
+不会自己长出新 key，所以这一步必须手动做一次。
+
+漏了会怎样：容器里没有 `.env` 文件（`Dockerfile` 只 `COPY app ./app`），这两项只能
+经 `docker-compose.yml` 的 `environment` 进去；缺了的话 `app/admin_auth.py` 在模块
+导入期就 `raise`，API 容器起不来并被 `restart: unless-stopped` 无限重启。而
+`Caddyfile` 的 `(shared)` 片段把**两个域名**的 `/api/*` 都反代到同一个 `api:3000`，
+所以那不只是后台挂，是官网预约、服务申请、小程序接口一起挂。
+
+`deploy.sh` 第 1 步已经会替你查这两个 key，缺了就在动手之前直接失败——
+但那是兜底，不是让你省掉这一步。
+
+### ② 建三张表
+
+`schema.sql` 只在**首次建库**时自动执行，`deploy.sh` 把它 scp 上去但**不执行**。
+`admin_users` / `admin_sessions` / `admin_login_attempts` 这三张表要手动建：
+
+```bash
+# 先同步一次文件（不换容器）
+wsl -d Ubuntu -- bash /mnt/d/code/vivid/server/deploy/deploy.sh --skip-build --skip-web
+
+ssh deploy@antonycasa.weelume.com
+cd /home/deploy/workspace/antony-casa && source .env
+docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" < schema.sql
+
+# 核对三张表都在
+docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+  -c "\dt admin_*"
+```
+
+漏了会怎样：新代码起来后每一条 `/api/admin/*` 和登录接口都 500
+（`relation "admin_sessions" does not exist`）。
+
+### ③ 前端和后端一起发
+
+```bash
+# Windows 侧先构建两份产物
+cd D:\code\vivid\antony-web; pnpm build
+cd D:\code\vivid\website;    pnpm build
+
+# WSL 里全量部署，⚠️ 这一支禁止加 --skip-web / --skip-build
+wsl -d Ubuntu -- bash /mnt/d/code/vivid/server/deploy/deploy.sh
+```
+
+**这一支不能用 `--skip-web`**：旧后台产物没有登录页，而新后端全线要鉴权，
+结果是打开后台满屏 401 且没地方登录。反过来只发前端不换后端也不行：
+新后台会去调 `POST /api/admin/auth/login`，旧后端没有这条路由，直接 404。
+
+全量部署里前端产物是先于 api 容器换的，中间仍有几十秒的新前端配旧后端——
+这段窗口没法消除（除非停机），但它只有几十秒，且只影响后台域名，可以接受。
+
+### ④ 用超管登一次
+
+```
+https://admin.antonycasa.weelume.com/
+```
+
+用 ① 里配的账号密码登进去，确认能看到预约列表、且「账号管理」页打得开。
+再确认官网和小程序的提交没受影响：
+
+```bash
+curl -sS https://antonycasa.weelume.com/health
+```
+
+登不进去先看日志：`docker compose logs --tail=50 api`。
+
 ## 日常部署
 
 ```bash
@@ -117,6 +204,42 @@ ssh -L 15432:localhost:5432 deploy@antonycasa.weelume.com \
     'docker compose -f /home/deploy/workspace/antony-casa/docker-compose.yml exec ...'
 # 或更简单：在服务器上 docker compose exec postgres pg_dump ... 再 scp 回来
 ```
+
+## 超管被锁住了 / token 泄漏了
+
+两件事后台里都做不了，只能连库手动处理（连法见上面「连库」）。
+
+**超管被锁在门外。** 登录失败计数锁的是**用户名**：同一个用户名连错 5 次锁 15 分钟。
+锁定期内的请求不再累加计数、也不延长锁，但只要每 15 分钟再发 5 个错密码，
+就能把超管一直锁着。超管是唯一能建号、重置密码、启停账号的角色，锁住它等于
+冻结全部账号运维。真被这么打了，先解锁、再把 `.env` 里的用户名换成不容易猜的值：
+
+```sql
+-- 解锁（<超管用户名> 就是 .env 里 ADMIN_SUPER_USERNAME 的值）
+DELETE FROM admin_login_attempts WHERE username = '<超管用户名>';
+
+-- 看一眼现在谁被锁着、锁到什么时候
+SELECT username, fail_count, locked_until FROM admin_login_attempts
+ WHERE locked_until > now();
+```
+
+换用户名之后要 `docker compose up -d api` 让它生效。
+换名字本身就是最有效的止损：攻击者不知道用户名就发不起这种锁定。
+
+**超管 token 泄漏了。** 会话有效期 12 小时、滑动续期，从签发起满 7 天绝对失效。
+但超管不入库，没有任何后台操作会清掉它的会话（普通管理员靠改密码 / 停用 / 删号
+就能吊销），所以只能删表行：
+
+```sql
+-- 吊销超管的全部登录态，下一次请求立刻 401
+DELETE FROM admin_sessions WHERE is_super;
+
+-- 看一眼现有的超管会话
+SELECT token, created_at, expires_at FROM admin_sessions WHERE is_super ORDER BY created_at;
+```
+
+泄漏的如果不只是 token 还有密码，删完会话还要改 `.env` 的 `ADMIN_SUPER_PASSWORD`
+并 `docker compose up -d api`。
 
 ## 持久化
 
@@ -200,7 +323,6 @@ wsl -d Ubuntu -- bash .../deploy.sh --skip-web
   挂了 `dependencies=[Depends(current_admin)]`），见 `server/README.md`「上线前
   要做的」。两个域名都能打到它这件事本身没变（Caddyfile 的 `shared` 片段里
   `/api/*` 是共用的），但现在打过去拿不到数据了
-- 后台管理打开就是数据，没有登录页；换到独立子域名只是不容易被撞见，不等于有防护
 - **COS 桶实测是「公有读私有写」**：对象拿到 URL 就能直接下载，签名在读这一侧
   没有拦截作用。桶权限收紧成私有读之后不用改代码，但要给 `static/` 前缀单独设
   公有读 ACL，否则小程序首页的品牌实拍图会全挂

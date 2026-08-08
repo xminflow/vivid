@@ -4,6 +4,8 @@
 不能用 TRUNCATE。
 """
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -164,6 +166,50 @@ async def test_logout_kills_the_token(client):
 async def test_expired_session_is_401(client):
     headers = await super_headers(client)
     token = headers["Authorization"].removeprefix("Bearer ")
+    async with pool.connection() as conn:
+        await conn.execute(
+            "UPDATE admin_sessions SET expires_at = now() - interval '1 minute' WHERE token = %s",
+            (token,),
+        )
+    assert (await client.get("/api/admin/auth/me", headers=headers)).status_code == 401
+
+
+async def test_a_session_past_the_max_lifetime_stops_being_renewed(client):
+    """签发超过 MAX_LIFETIME 的会话不再滑动续期，到点就自己死。
+
+    这条守的是超管：它不入库，改密码/停用/删号那三条吊销路径一条都用不上，
+    滑动续期又是「每 6 小时用一次就永远续」——没有这个绝对上限，一个泄漏的
+    超管 token 就是永久有效的，后台里没有任何操作能撤销它。
+    """
+    headers = await super_headers(client)
+    token = headers["Authorization"].removeprefix("Bearer ")
+
+    # 造一条「7 天前签发、还剩 1 小时到期」的会话：剩余远不足半个 TTL，
+    # 要不是有绝对上限，这次请求一定会把它续满 12 小时
+    async with pool.connection() as conn:
+        await conn.execute(
+            """
+            UPDATE admin_sessions
+               SET created_at = now() - interval '8 days',
+                   expires_at = now() + interval '1 hour'
+             WHERE token = %s
+            """,
+            (token,),
+        )
+
+    # 还没到 expires_at，这一次请求本身仍然放行——上限只是不再续，不是立刻踢人
+    assert (await client.get("/api/admin/auth/me", headers=headers)).status_code == 200
+
+    async with pool.connection() as conn:
+        row = await (
+            await conn.execute(
+                "SELECT expires_at FROM admin_sessions WHERE token = %s", (token,)
+            )
+        ).fetchone()
+    remaining = row["expires_at"] - datetime.now(timezone.utc)
+    assert remaining < timedelta(hours=2), f"到期时间被续了：还剩 {remaining}"
+
+    # 过了 expires_at 就彻底进不来，没有第二次机会
     async with pool.connection() as conn:
         await conn.execute(
             "UPDATE admin_sessions SET expires_at = now() - interval '1 minute' WHERE token = %s",

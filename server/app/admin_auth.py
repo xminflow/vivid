@@ -18,6 +18,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 import psycopg
+from anyio import to_thread
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 # 这一行同时把仓库根的 .env 读进环境变量（db.py 在导入时 load_dotenv），
@@ -53,6 +54,16 @@ except UnicodeEncodeError:
 # 登录态有效期。比小程序那边的 30 天短得多：后台一屏就是全量客户手机号，
 # 一台没锁屏的电脑不该一个月都是登录状态
 TOKEN_TTL = timedelta(hours=12)
+
+# 会话的绝对上限：不管续期多勤，从签发那刻起满 7 天就不再续，到期即死。
+#
+# 这条是专门为超管加的。普通管理员有三条吊销路径——改密码删掉他别处的会话、
+# 停用账号顺手删会话、删号靠外键级联删会话；超管一条都没有：它不入库，
+# 没有任何 admin_sessions 行会因为它被删，改配置重启也不清会话（会话在库里）。
+# 再叠上滑动续期「每 6 小时用一次就永远续」，一个泄漏的超管 token 就等于永久的
+# 全量客户资料访问权，后台里没有任何操作能撤销它。给个绝对上限，最坏情况
+# 也就是 7 天后自动失效。要立刻吊销仍然只能手删表行，SQL 见 README「超管 token 泄漏了」
+MAX_LIFETIME = timedelta(days=7)
 
 # 连错几次锁多久。锁的是用户名不是 IP：超管账号只有一个，锁它才拦得住爆破，
 # 锁 IP 会让同一个办公室的运营互相牵连
@@ -99,7 +110,7 @@ async def current_admin(authorization: str = Header(default="")) -> dict:
         row = await (
             await conn.execute(
                 """
-                SELECT s.admin_id, s.is_super, s.expires_at,
+                SELECT s.admin_id, s.is_super, s.expires_at, s.created_at,
                        a.username, a.display_name, a.status
                   FROM admin_sessions s
                   LEFT JOIN admin_users a ON a.id = s.admin_id
@@ -120,8 +131,13 @@ async def current_admin(authorization: str = Header(default="")) -> dict:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "账号已被停用，请联系超级管理员")
 
         # 滑动续期：剩余不足一半就续满。固定 12 小时会让运营正干到一半被踢出去，
-        # 而一直在用的会话本来就说明人在电脑前
-        if row["expires_at"] - _now() < TOKEN_TTL / 2:
+        # 而一直在用的会话本来就说明人在电脑前。
+        # 但续期不能无限续下去，签发满 MAX_LIFETIME 之后就不再续（见上面那段注释：
+        # 超管的会话没有任何吊销手段，只能靠这个上限保证它总会自己死掉）
+        if (
+            row["expires_at"] - _now() < TOKEN_TTL / 2
+            and _now() - row["created_at"] < MAX_LIFETIME
+        ):
             await conn.execute(
                 "UPDATE admin_sessions SET expires_at = %s WHERE token = %s",
                 (_now() + TOKEN_TTL, token),
@@ -212,6 +228,11 @@ async def login(body: AdminLoginIn) -> dict:
     username = body.username
 
     try:
+        admin_id: int | None = None
+        is_super = username == SUPER_USERNAME
+
+        # 第一段库操作：查限流状态 + 查账号。查完就把连接还回池里，
+        # 下面那次 scrypt 是纯 CPU 活，不该占着池里 5 条连接中的一条跑 100ms
         async with pool.connection() as conn:
             prior = await _attempts(conn, username)
             if prior and prior["locked_until"] and prior["locked_until"] > _now():
@@ -220,9 +241,6 @@ async def login(body: AdminLoginIn) -> dict:
                     status.HTTP_429_TOO_MANY_REQUESTS,
                     f"密码错误次数过多，请 {minutes} 分钟后再试",
                 )
-
-            admin_id: int | None = None
-            is_super = username == SUPER_USERNAME
 
             # 不管是不是超管都先查一次 admin_users——超管本来就不在这张表里，
             # 这里必然查不到，但每一条路径都要付这一次 SELECT 往返，否则
@@ -235,25 +253,33 @@ async def login(body: AdminLoginIn) -> dict:
                 )
             ).fetchone()
 
-            if is_super:
-                ok = verify_password(body.password, _SUPER_PASSWORD_HASH)
-            else:
-                # row 为 None（用户名不存在）时也要跑一遍 verify_password，用假哈希
-                # 垫上同样的 scrypt 耗时——`and` 短路会让「不存在」比「存在但密码错」
-                # 快一个数量级，那个时间差本身就是一个免费的用户名探测 oracle。
-                # 这行不是多余代码，看着像 dead code 但删了就是开了个计时侧信道
-                ok = verify_password(
-                    body.password, row["password_hash"] if row else _DUMMY_PASSWORD_HASH
-                )
-                if row is not None and ok and row["status"] != "active":
-                    # 密码是对的，只是号被停了。这条不算失败计数——
-                    # 本人反复试自己的密码不是爆破
-                    raise HTTPException(
-                        status.HTTP_403_FORBIDDEN, "账号已被停用，请联系超级管理员"
-                    )
-                if row is not None and ok:
-                    admin_id = row["id"]
+        # 三条路径（超管 / 真实管理员 / 不存在的用户名）在这里合成同一句：
+        # 各自恰好跑一次 scrypt，谁都不会被短路成零次、也不会跑两次。
+        # 用户名不存在时垫的是 _DUMMY_PASSWORD_HASH——少了它，「不存在」会比
+        # 「存在但密码错」快一个数量级，那个时间差就是个免费的用户名探测 oracle
+        if is_super:
+            stored_hash = _SUPER_PASSWORD_HASH
+        elif row is not None:
+            stored_hash = row["password_hash"]
+        else:
+            stored_hash = _DUMMY_PASSWORD_HASH
 
+        # scrypt 一次 60-100ms 的纯 CPU，同步调用会把整个事件循环钉住——线上是
+        # 单进程单 worker 的 uvicorn，那 100ms 里官网、小程序、后台的请求全都排队。
+        # 登录接口不需要鉴权就能打，这等于给了个免费的整站拒绝服务开关。
+        # 挪进 anyio 的线程池（starlette 自带 anyio，不多一个依赖）：GIL 在
+        # hashlib.scrypt 里是释放的，主循环期间照常收发请求
+        ok = await to_thread.run_sync(verify_password, body.password, stored_hash)
+
+        if not is_super and row is not None and ok:
+            if row["status"] != "active":
+                # 密码是对的，只是号被停了。这条不算失败计数——
+                # 本人反复试自己的密码不是爆破
+                raise HTTPException(status.HTTP_403_FORBIDDEN, "账号已被停用，请联系超级管理员")
+            admin_id = row["id"]
+
+        # 第二段库操作：记失败 / 清计数 + 建会话
+        async with pool.connection() as conn:
             if not ok:
                 await _record_failure(conn, username)
                 # 显式提交：接下来这行 raise 会让 `async with pool.connection()`
