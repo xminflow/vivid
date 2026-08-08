@@ -13,6 +13,13 @@ from app.main import app
 
 TEST_PREFIX = "test."
 
+# 本文件里每一次成功登录（含反复调用 super_headers()）拿到的 token，测试跑完要
+# 精确删掉这些会话对应的行。不能按 `is_super` 一刀切删：conftest.py 的
+# auth_headers 也是一条超管会话，test_admin.py / test_home_media.py 整个测试
+# 会话期间都在用它，粗暴地按 is_super 删会把那条也删掉，那两个文件会莫名其妙
+# 全红。精确记 token、精确删，才不会误伤别的文件正在用的会话
+_issued_tokens: set[str] = set()
+
 
 async def clean() -> None:
     async with pool.connection() as conn:
@@ -26,6 +33,14 @@ async def clean() -> None:
         await conn.execute(
             "DELETE FROM admin_login_attempts WHERE username = %s", (SUPER_USERNAME,)
         )
+        # 本文件登录超管建的那些会话按 token 精确删掉——见 _issued_tokens 上面
+        # 那段注释，为什么不能按 is_super 整批删
+        if _issued_tokens:
+            await conn.execute(
+                "DELETE FROM admin_sessions WHERE token = ANY(%s)",
+                (list(_issued_tokens),),
+            )
+            _issued_tokens.clear()
 
 
 @pytest.fixture
@@ -38,9 +53,13 @@ async def client():
 
 
 async def login(client, username: str, password: str):
-    return await client.post(
+    r = await client.post(
         "/api/admin/auth/login", json={"username": username, "password": password}
     )
+    if r.status_code == 200:
+        # 记下这个 token，交给 clean() 在这条测试结束时精确删掉
+        _issued_tokens.add(r.json()["token"])
+    return r
 
 
 async def super_headers(client) -> dict:
