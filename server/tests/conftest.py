@@ -10,9 +10,18 @@
 在它之后建立，也就一定在它之前 teardown，池还开着。
 """
 
+import asyncio
+import sys
+
 import pytest
 
 from app.db import pool
+
+# Windows 上 asyncio 默认用 ProactorEventLoop，psycopg 的异步模式不认它
+# （它没有 socket 的 add_reader），表现是每条测试都 PoolTimeout，看着像连不上库。
+# 线上跑在 Linux 容器里没这个问题，所以只在测试这一侧切回 SelectorEventLoop。
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 @pytest.fixture(scope="session", autouse=True)
