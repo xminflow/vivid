@@ -13,6 +13,7 @@ from psycopg.types.json import Json
 
 from . import cos, snowflake
 from .admin import router as admin_router
+from .admin_auth import router as admin_auth_router
 from .db import pool
 from .home import router as home_router
 from .logging_setup import setup_logging
@@ -42,6 +43,12 @@ FIELD_MESSAGES = {
     "region": "地区选择不正确",
     "avatarKey": "头像标识不合法",
     "code": "登录信息缺失，请重试",
+    # 管理后台登录
+    "username": "用户名要 3-32 位，只能用字母、数字和 _ . -",
+    "password": "密码要 8 到 64 位",
+    "oldPassword": "请输入当前密码",
+    "newPassword": "新密码要 8 到 64 位",
+    "displayName": "姓名过长",
 }
 
 
@@ -61,10 +68,12 @@ app = FastAPI(title="展厅预约登记", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET", "POST", "PUT", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
+# 登录接口自己不能要求登录，所以它是独立的 router，不带 admin_router 上那个鉴权依赖
+app.include_router(admin_auth_router)
 app.include_router(users_router)
 app.include_router(home_router)
 app.include_router(admin_router)

@@ -234,3 +234,66 @@ class HomeMediaIn(BaseModel):
         if len(set(v)) != len(v):
             raise ValueError("同一组里有重复的图片")
         return v
+
+
+# ---------------------------------------------------------------------------
+# 管理端账号
+#
+# 注意这一节的模型服务的是**后台管理员**，与上面 users 表那套（小程序用户）
+# 完全是两回事，不要混用。
+
+# 与 schema.sql 的 admin_users.username CHECK 逐字一致
+ADMIN_USERNAME_PATTERN = r"^[a-zA-Z0-9_.-]{3,32}$"
+
+AdminUsername = Annotated[Trimmed, Field(pattern=ADMIN_USERNAME_PATTERN)]
+# 长度上下限见 app/security.py，那里解释了为什么不强制字符组合
+AdminPassword = Annotated[str, Field(min_length=8, max_length=64)]
+
+
+class AdminLoginIn(BaseModel):
+    """登录。
+
+    这里**不**按 ADMIN_USERNAME_PATTERN 卡用户名：格式不对的用户名本来就登不上，
+    提前回一个「格式不正确」等于告诉爆破的人这批候选不用试。一律走到密码比对，
+    回同一句「用户名或密码不正确」。
+    """
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    username: Annotated[Trimmed, Field(min_length=1, max_length=64)]
+    password: Annotated[str, Field(min_length=1, max_length=200)]
+
+
+class AdminPasswordChangeIn(BaseModel):
+    """改自己的密码。旧密码必填，防的是有人借着没锁屏的电脑改密码顶掉本人。"""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    old_password: Annotated[str, Field(min_length=1, max_length=200)]
+    new_password: AdminPassword
+
+
+class AdminAccountIn(BaseModel):
+    """超管建号。没有注册入口，账号只能从这里来。"""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    username: AdminUsername
+    display_name: Annotated[Trimmed, Field(max_length=40)] = ""
+    password: AdminPassword
+
+
+class AdminPasswordResetIn(BaseModel):
+    """超管重置别人的密码。不要旧密码——超管本来就不知道对方的密码。"""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    password: AdminPassword
+
+
+class AdminStatusIn(BaseModel):
+    """启用 / 停用。取值与 schema.sql 的 admin_users.status CHECK 逐字一致。"""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    status: Literal["active", "disabled"]
