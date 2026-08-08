@@ -1,5 +1,9 @@
 // 安东尼之家后台接口。服务端是仓库里的 server/（FastAPI）。
 // 开发时 vite 把 /api/admin 代理过去，见 vite.config.ts。
+//
+// 请求本身（登录态、401 处理、错误约定）在 @/lib/api，这里只列有哪些接口。
+
+import { call, get } from '@/lib/api'
 
 import type {
   Appointment,
@@ -12,49 +16,9 @@ import type {
   ServiceApplicationQuery,
 } from './types'
 
-const BASE = '/api/admin'
-
 export type PageParams = {
   page: number
   pageSize: number
-}
-
-/**
- * 服务端约定：成功是 {ok:true, ...}，失败是 {ok:false, message}，HTTP 状态码同时表达。
- * 这里不吞异常也不给默认值——查不出来就该在页面上报错，
- * 悄悄返回空列表会被当成「今天没人预约」。
- */
-async function call<T>(path: string, init?: RequestInit): Promise<T> {
-  let res: Response
-  try {
-    res = await fetch(`${BASE}${path}`, init)
-  } catch (err) {
-    throw new Error(`连不上后台服务：${err instanceof Error ? err.message : String(err)}`)
-  }
-
-  const body: unknown = await res.json().catch(() => null)
-  if (!res.ok || !isOk(body)) {
-    throw new Error(errorMessage(body) ?? `请求失败（HTTP ${res.status}）`)
-  }
-  return body as T
-}
-
-async function get<T>(path: string, params: Record<string, string | number>): Promise<T> {
-  const query = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== '' && value !== null && value !== undefined) query.set(key, String(value))
-  }
-  return call<T>(`${path}?${query}`)
-}
-
-function isOk(body: unknown): boolean {
-  return typeof body === 'object' && body !== null && (body as { ok?: unknown }).ok === true
-}
-
-function errorMessage(body: unknown): string | null {
-  if (typeof body !== 'object' || body === null) return null
-  const message = (body as { message?: unknown }).message
-  return typeof message === 'string' ? message : null
 }
 
 export const listAppointments = (params: AppointmentQuery & PageParams) =>
