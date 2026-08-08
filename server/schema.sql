@@ -223,3 +223,55 @@ DROP TRIGGER IF EXISTS home_media_touch_updated_at ON home_media;
 CREATE TRIGGER home_media_touch_updated_at
   BEFORE UPDATE ON home_media
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+-- ============================================================
+-- 管理端账号
+-- ============================================================
+-- 后台 /api/admin 那组接口出的是全量客户资料，必须登录才能看。
+--
+-- 超级管理员**不在 admin_users 里**：它由服务器配置文件
+-- （ADMIN_SUPER_USERNAME / ADMIN_SUPER_PASSWORD）定义，见 app/admin_auth.py。
+-- 所以这张表不需要 role 列——里面每一行都是普通管理员，由超管在后台创建。
+CREATE TABLE IF NOT EXISTS admin_users (
+  id            bigint      PRIMARY KEY,
+  username      text        NOT NULL UNIQUE
+                            CONSTRAINT admin_users_username_format
+                            CHECK (username ~ '^[a-zA-Z0-9_.-]{3,32}$'),
+  display_name  text        NOT NULL DEFAULT ''
+                            CHECK (length(display_name) <= 40),
+  password_hash text        NOT NULL,
+  status        text        NOT NULL DEFAULT 'active'
+                            CHECK (status IN ('active', 'disabled')),
+  last_login_at timestamptz,
+  login_count   integer     NOT NULL DEFAULT 0,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+
+DROP TRIGGER IF EXISTS admin_users_touch_updated_at ON admin_users;
+CREATE TRIGGER admin_users_touch_updated_at
+  BEFORE UPDATE ON admin_users
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+-- 登录态。admin_id 可空是因为超管不入库，它的会话 admin_id 是 NULL、
+-- is_super 是 true，CHECK 把两者锁成互斥。
+-- ON DELETE CASCADE：删号即踢下线，不用另写清会话的代码。
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  token       text        PRIMARY KEY,
+  admin_id    bigint      REFERENCES admin_users (id) ON DELETE CASCADE,
+  is_super    boolean     NOT NULL DEFAULT false,
+  expires_at  timestamptz NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT admin_sessions_subject CHECK (
+    (is_super AND admin_id IS NULL) OR (NOT is_super AND admin_id IS NOT NULL)
+  )
+);
+
+CREATE INDEX IF NOT EXISTS admin_sessions_admin_idx ON admin_sessions (admin_id);
+
+-- 登录失败计数，防爆破。落库不放内存：云托管多实例时内存计数等于没计数
+CREATE TABLE IF NOT EXISTS admin_login_attempts (
+  username     text        PRIMARY KEY,
+  fail_count   integer     NOT NULL DEFAULT 0,
+  locked_until timestamptz
+);
