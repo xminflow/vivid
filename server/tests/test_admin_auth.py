@@ -285,8 +285,13 @@ async def test_normal_admin_cannot_touch_account_management(client):
 async def test_normal_admin_changes_own_password(client):
     headers = await super_headers(client)
     await make_account(client, headers)
-    r = await login(client, "test.alice", "alice-pass-1")
-    alice = {"Authorization": f"Bearer {r.json()['token']}"}
+    # 登两次，拿两条不同的会话：一条模拟「别处」还开着的登录态，用另一条去改密码，
+    # 才能验出 admin_auth.py 里 `DELETE ... AND token <> %s` 那一半——只验当前
+    # 这条会话留着，验不出别处的会话是不是真的被清掉了
+    r1 = await login(client, "test.alice", "alice-pass-1")
+    elsewhere = {"Authorization": f"Bearer {r1.json()['token']}"}
+    r2 = await login(client, "test.alice", "alice-pass-1")
+    alice = {"Authorization": f"Bearer {r2.json()['token']}"}
 
     bad = await client.put(
         "/api/admin/auth/password",
@@ -306,6 +311,8 @@ async def test_normal_admin_changes_own_password(client):
     assert (await login(client, "test.alice", "alice-pass-2")).status_code == 200
     # 改密码的那条会话自己留着，不用重登
     assert (await client.get("/api/admin/auth/me", headers=alice)).status_code == 200
+    # 「别处」那条会话被清掉了——这是改密码防不住已登录的人这条安全行为的核心
+    assert (await client.get("/api/admin/auth/me", headers=elsewhere)).status_code == 401
 
 
 async def test_reserved_and_duplicate_usernames_are_refused(client):
@@ -317,6 +324,12 @@ async def test_reserved_and_duplicate_usernames_are_refused(client):
     )
     # 建一个和超管同名的普通账号，登录时永远被超管判定抢先命中，是个点不动的鬼影
     assert reserved.status_code == 400, reserved.text
+    # 光断言 400 不够：SUPER_USERNAME 现在配的是 "root"，格式上也合法，这个 400
+    # 确实来自 admin_accounts.py 里的保留检查。但哪天超管用户名配成不合
+    # ADMIN_USERNAME_PATTERN 的值（比如带 @ 或短于 3 位），Pydantic 的格式校验会
+    # 抢在保留检查前面同样返 400，这条测试会安静地测不到保留检查那一分支了。
+    # 断言文案钉死来源，不让这条覆盖跟着配置值漂移
+    assert "被保留" in reserved.json()["message"], reserved.text
 
     await make_account(client, headers)
     dup = await client.post(
@@ -362,6 +375,18 @@ async def test_disabling_an_account_kills_its_session_immediately(client):
     # 也登不回来
     assert (await login(client, "test.alice", "alice-pass-1")).status_code == 403
 
+    # 闭环走完：重新启用，账号要能登回来。"active" 这条分支、以及
+    # set_status 里 `if body.status == "disabled"` 的 else 分支，
+    # 在这行加之前从没被执行过
+    r = await client.put(
+        f"/api/admin/accounts/{account['id']}/status",
+        headers=headers,
+        json={"status": "active"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["account"]["status"] == "active"
+    assert (await login(client, "test.alice", "alice-pass-1")).status_code == 200
+
 
 async def test_reset_password_logs_the_account_out_everywhere(client):
     headers = await super_headers(client)
@@ -399,6 +424,10 @@ async def test_operations_on_a_missing_account_are_404(client):
     assert (await client.delete(f"/api/admin/accounts/{missing}", headers=headers)).status_code == 404
     r = await client.put(
         f"/api/admin/accounts/{missing}/status", headers=headers, json={"status": "disabled"}
+    )
+    assert r.status_code == 404
+    r = await client.put(
+        f"/api/admin/accounts/{missing}/password", headers=headers, json={"password": "whatever-11"}
     )
     assert r.status_code == 404
 

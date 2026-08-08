@@ -80,8 +80,16 @@ async def create_account(body: AdminAccountIn) -> dict:
             ).fetchone()
     except psycopg.errors.UniqueViolation:
         raise HTTPException(status.HTTP_409_CONFLICT, "这个用户名已被占用") from None
-    except psycopg.Error:
-        logger.exception("创建管理员账号失败 username=%s", body.username)
+    except psycopg.Error as exc:
+        # 不用 logger.exception：这条 INSERT 带着 password_hash，一旦库上的 CHECK
+        # 约束（如用户名格式）哪天和 models.py 的校验漂移不一致而被真的触发，
+        # psycopg 的异常字符串会带 Postgres 的 DETAIL——形如
+        # "Failing row contains (..., password_hash值, ...)"，把 logger.exception
+        # 打进去等于把密码哈希写进日志文件。只打 sqlstate 和用户名，够定位问题，
+        # 又不会带上那一行的具体列值
+        logger.error(
+            "创建管理员账号失败 username=%s sqlstate=%s", body.username, exc.sqlstate
+        )
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR, "创建失败，请稍后再试"
         ) from None
