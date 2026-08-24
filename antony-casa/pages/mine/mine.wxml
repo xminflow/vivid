@@ -163,7 +163,8 @@
       <view class="card card-advisor">
         <text class="adv-hi">Hi{{profile.memberName ? '，' + profile.memberName : ''}}</text>
 
-        <text class="adv-line">我是{{advisor.name ? advisor.name : '（顾问姓名待定）'}}，是您在安东尼之家的专属服务顾问。我很荣幸能够为您提供服务！</text>
+        <!-- 顾问姓名没定时整句略过名字，不留「（姓名待定）」这种占位给客户看 -->
+        <text class="adv-line">我是{{advisor.name ? advisor.name + '，是您' : '您'}}在安东尼之家的专属服务顾问。我很荣幸能够为您提供服务！</text>
         <text class="adv-line">您可以通过以下的方式找到我，</text>
 
         <!-- 号码点一下直接拨 -->
@@ -239,7 +240,6 @@
               <text class="rec-date">{{item.dateText}}</text>
               <text class="rec-meta">{{item.purpose}} · {{item.partySize}} 人</text>
             </view>
-            <text class="rec-state">{{item.stateText}}</text>
           </view>
         </block>
 
@@ -247,6 +247,20 @@
           <text class="empty-text">还没有预约记录</text>
         </view>
       </view>
+    </view>
+  </view>
+
+  <!-- ========== 安玺·集 ==========
+       订单和地址是两个独立页面，不做成可展开的分区：它们内容多、有自己的
+       分页和表单，塞进这一页会让「我的」变成一个什么都有的长页面 -->
+  <view class="sec">
+    <view class="link" bindtap="onOrders" hover-class="link-hover" hover-stay-time="120">
+      <text class="link-title">我的订单</text>
+      <text class="link-mark">›</text>
+    </view>
+    <view class="link" bindtap="onAddresses" hover-class="link-hover" hover-stay-time="120">
+      <text class="link-title">收货地址</text>
+      <text class="link-mark">›</text>
     </view>
   </view>
 

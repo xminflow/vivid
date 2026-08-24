@@ -1,0 +1,235 @@
+/* order.wxss 订单详情：黑色状态头 + 白卡分组 */
+
+.page {
+  min-height: 100vh;
+  padding-bottom: 40rpx;
+  background: var(--sfondo);
+}
+
+.state {
+  padding: 200rpx 40rpx;
+  text-align: center;
+}
+
+.state-text {
+  display: block;
+  font-size: 28rpx;
+  color: var(--grigio-chiaro);
+}
+
+/* ---------- 状态头 ---------- */
+
+.hero {
+  padding: 48rpx 32rpx 56rpx;
+  background: var(--nero);
+}
+
+.hero-status {
+  display: block;
+  font-size: 40rpx;
+  font-weight: 600;
+  letter-spacing: var(--ls-display);
+  color: var(--su-foto);
+}
+
+.hero-hint {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  color: var(--su-foto-debole);
+}
+
+/* ---------- 白卡 ---------- */
+
+.card {
+  margin: 24rpx 32rpx 0;
+  padding: 32rpx;
+  background: var(--bianco);
+  border-radius: var(--radius);
+}
+
+/* 第一张卡向上叠住状态头的下沿，做出层次 */
+.card:first-of-type {
+  margin-top: -24rpx;
+}
+
+/* ---------- 地址 ---------- */
+
+.addr-head {
+  display: flex;
+  align-items: center;
+}
+
+.addr-receiver {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--nero);
+}
+
+.addr-phone {
+  margin-left: 20rpx;
+  font-size: 26rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+}
+
+.addr-detail {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  line-height: 1.6;
+  color: var(--grigio);
+}
+
+/* ---------- 订单行 ---------- */
+
+.row {
+  display: flex;
+  padding-bottom: 28rpx;
+  margin-bottom: 28rpx;
+  border-bottom: 1rpx solid var(--hairline);
+}
+
+.row-hover {
+  opacity: 0.72;
+}
+
+.cover {
+  width: 160rpx;
+  height: 160rpx;
+  flex: none;
+  border-radius: 8rpx;
+  background: var(--sfondo);
+}
+
+.cover-empty {
+  background: var(--sfondo);
+}
+
+.row-body {
+  flex: 1;
+  margin-left: 24rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.row-title {
+  font-size: 28rpx;
+  line-height: 1.5;
+  color: var(--nero);
+}
+
+.row-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.row-price {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--nero);
+}
+
+.row-qty {
+  font-size: 26rpx;
+  color: var(--grigio);
+}
+
+.total {
+  text-align: right;
+}
+
+.total-text {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--nero);
+}
+
+/* ---------- 信息行 ---------- */
+
+.meta {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 0;
+}
+
+.meta-label {
+  width: 160rpx;
+  flex: none;
+  font-size: 26rpx;
+  color: var(--grigio);
+}
+
+.meta-value {
+  flex: 1;
+  font-size: 26rpx;
+  color: var(--nero);
+  word-break: break-all;
+}
+
+.meta-copy {
+  margin-left: 16rpx;
+  padding: 4rpx 20rpx;
+  font-size: 22rpx;
+  color: var(--grigio);
+  border: 1rpx solid var(--hairline);
+  border-radius: 999rpx;
+}
+
+.tail {
+  height: 160rpx;
+}
+
+/* ---------- 底部操作 ---------- */
+
+.bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding: 20rpx 32rpx calc(20rpx + env(safe-area-inset-bottom));
+  background: var(--bianco);
+  border-top: 1rpx solid var(--hairline);
+}
+
+.cancel {
+  padding: 20rpx 48rpx;
+  border: 1rpx solid var(--hairline);
+  border-radius: 999rpx;
+}
+
+.cancel-hover {
+  opacity: 0.72;
+}
+
+.cancel-text {
+  font-size: 26rpx;
+  color: var(--grigio);
+}
+
+/* 主操作。和「取消订单」并排时靠实心/描边区分——两个动作的后果差别很大，
+   同为描边的话用户分不清该点哪个 */
+.pay {
+  margin-left: 20rpx;
+  padding: 20rpx 56rpx;
+  background: var(--nero);
+  border-radius: 999rpx;
+}
+
+.pay-hover {
+  opacity: 0.72;
+}
+
+.pay-off {
+  opacity: 0.4;
+}
+
+.pay-text {
+  font-size: 26rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--su-foto);
+}

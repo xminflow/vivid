@@ -1,0 +1,50 @@
+<!--address.wxml 收货地址簿：列表、设默认、删除-->
+<view class="page">
+
+  <view class="state" wx:if="{{loading && !items.length}}">
+    <text class="state-text">加载中…</text>
+  </view>
+
+  <view class="state" wx:elif="{{!items.length}}">
+    <text class="state-text">还没有收货地址</text>
+  </view>
+
+  <scroll-view class="list" scroll-y enhanced show-scrollbar="{{false}}" wx:else>
+    <view class="card" wx:for="{{items}}" wx:key="id">
+
+      <!-- 整块可点：管理模式下是去编辑，选地址模式下是选中返回 -->
+      <view class="main" data-id="{{item.id}}" bindtap="onPick" hover-class="main-hover">
+        <view class="head">
+          <text class="receiver">{{item.receiver}}</text>
+          <text class="phone">{{item.phone}}</text>
+          <text class="tag" wx:if="{{item.isDefault}}">默认</text>
+        </view>
+        <text class="detail">{{item.province}}{{item.city}}{{item.district}} {{item.detail}}</text>
+      </view>
+
+      <view class="ops">
+        <view class="op" data-id="{{item.id}}" bindtap="onSetDefault" wx:if="{{!item.isDefault}}">
+          <text class="op-text">设为默认</text>
+        </view>
+        <!-- 选地址模式下整行被「选中」占用了，编辑要单独露出来 -->
+        <view class="op" data-id="{{item.id}}" bindtap="onEdit" wx:if="{{picking}}">
+          <text class="op-text">编辑</text>
+        </view>
+        <view class="op" data-id="{{item.id}}" bindtap="onRemove">
+          <text class="op-text">删除</text>
+        </view>
+      </view>
+
+    </view>
+
+    <!-- 底部按钮是 fixed 的，尾部留白免得最后一张卡被压住 -->
+    <view class="list-tail"></view>
+  </scroll-view>
+
+  <view class="bar">
+    <view class="add" bindtap="onAdd" hover-class="add-hover">
+      <text class="add-text">新增收货地址</text>
+    </view>
+  </view>
+
+</view>

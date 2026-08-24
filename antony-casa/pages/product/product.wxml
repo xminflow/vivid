@@ -1,0 +1,102 @@
+<!--product.wxml 商品详情：图集、价格、简介、参数、详情图-->
+<view class="page">
+
+  <view class="state" wx:if="{{loading}}">
+    <text class="state-text">加载中…</text>
+  </view>
+
+  <view class="state" wx:elif="{{error}}">
+    <text class="state-text">{{error}}</text>
+  </view>
+
+  <block wx:else>
+    <!-- 图集。第一张就是列表页的封面，上架必有图，所以这里不做空态兜底 -->
+    <view class="gallery" wx:if="{{product.images.length}}">
+      <swiper
+        class="gallery-swiper"
+        circular="{{product.images.length > 1}}"
+        bindchange="onImageChange"
+      >
+        <swiper-item wx:for="{{product.images}}" wx:for-item="url" wx:key="*this">
+          <image
+            class="gallery-image"
+            src="{{url}}"
+            mode="aspectFill"
+            data-i="{{index}}"
+            bindtap="onPreviewImage"
+          />
+        </swiper-item>
+      </swiper>
+      <!-- 单张时不出圆点：一个孤零零的点只会让人以为还有别的图 -->
+      <view class="dots" wx:if="{{product.images.length > 1}}">
+        <view
+          class="dot {{imageIndex === index ? 'dot-on' : ''}}"
+          wx:for="{{product.images}}"
+          wx:for-item="url"
+          wx:key="*this"
+        ></view>
+      </view>
+    </view>
+
+    <!-- 标题与价格 -->
+    <view class="head">
+      <text class="price">¥ {{price}}</text>
+      <text class="title">{{product.title}}</text>
+      <text class="summary" wx:if="{{product.summary}}">{{product.summary}}</text>
+    </view>
+
+    <!-- 参数表。展示型属性，不影响价格与可购性 -->
+    <view class="block" wx:if="{{product.params.length}}">
+      <text class="block-title">参数</text>
+      <view class="param" wx:for="{{product.params}}" wx:for-item="row" wx:key="name">
+        <text class="param-name">{{row.name}}</text>
+        <text class="param-value">{{row.value}}</text>
+      </view>
+    </view>
+
+    <!-- 详情图。与参数同为卡片版式，widthFix 让高度跟着原图比例走，不会裁掉内容 -->
+    <view class="block" wx:if="{{product.detailImages.length}}">
+      <text class="block-title">详情</text>
+      <image
+        class="detail-image"
+        wx:for="{{product.detailImages}}"
+        wx:for-item="url"
+        wx:key="*this"
+        src="{{url}}"
+        mode="widthFix"
+        lazy-load
+        show-menu-by-longpress
+        data-i="{{index}}"
+        bindtap="onPreviewDetail"
+      />
+    </view>
+
+    <view class="tail">
+      <text class="tail-text">安玺·集 · ANTONY CASA</text>
+    </view>
+
+    <!-- 底部操作栏是 fixed 的，正文尾部留出等高空白，否则最后一屏被压住 -->
+    <view class="bar-hold"></view>
+
+    <view class="bar">
+      <view class="bar-cart" bindtap="onCart" hover-class="bar-cart-hover">
+        <image class="bar-cart-icon" src="/assets/shop/cart-dark.png" mode="aspectFit" />
+        <text class="bar-cart-text">购物车</text>
+        <view class="bar-badge" wx:if="{{cartQuantity > 0}}">
+          <text class="bar-badge-text">{{cartQuantity > 99 ? '99+' : cartQuantity}}</text>
+        </view>
+      </view>
+
+      <view class="bar-add" bindtap="onAdd" hover-class="bar-add-hover">
+        <text class="bar-add-text">{{adding ? '添加中…' : '加入购物车'}}</text>
+      </view>
+
+      <!-- 立即购买：不经过购物车直接去结算。订单的 source 记 direct，
+           这样支付成功后不会清掉用户车里的同款 -->
+      <view class="bar-buy" bindtap="onBuy" hover-class="bar-buy-hover">
+        <text class="bar-buy-text">立即购买</text>
+      </view>
+    </view>
+  </block>
+
+</view>

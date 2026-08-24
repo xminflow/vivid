@@ -1,0 +1,276 @@
+/* product.wxss 商品详情：图先说话，字往后退 */
+
+.page {
+  min-height: 100vh;
+  padding-bottom: 60rpx;
+  background: var(--sfondo);
+}
+
+/* ---------- 加载与错误 ---------- */
+
+.state {
+  padding: 200rpx 40rpx;
+  text-align: center;
+}
+
+.state-text {
+  font-size: 28rpx;
+  color: var(--grigio-chiaro);
+}
+
+/* ---------- 图集 ---------- */
+
+.gallery {
+  position: relative;
+  background: var(--bianco);
+}
+
+/* 正方形：家具的构图横竖都有，方图是唯一不会两头都裁坏的比例 */
+.gallery-swiper {
+  width: 100%;
+  height: 750rpx;
+}
+
+.gallery-image {
+  width: 100%;
+  height: 100%;
+}
+
+/* 圆点压在图上，用白色半透明——图的底部深浅不定，纯白会糊掉 */
+.dots {
+  position: absolute;
+  right: 0;
+  bottom: 24rpx;
+  left: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.dot {
+  width: 10rpx;
+  height: 10rpx;
+  margin: 0 6rpx;
+  background: var(--su-foto-debole);
+  border-radius: 50%;
+}
+
+.dot-on {
+  background: var(--su-foto);
+}
+
+/* ---------- 标题与价格 ---------- */
+
+.head {
+  margin: 16rpx 32rpx 0;
+  padding: 32rpx;
+  background: var(--bianco);
+  border-radius: var(--radius);
+}
+
+/* 价格放在标题上方且最重：这是购物板块，用户第一眼要找的就是它 */
+.price {
+  display: block;
+  font-size: 44rpx;
+  font-weight: 600;
+  letter-spacing: var(--ls-display);
+  line-height: 1.3;
+  color: var(--nero);
+}
+
+.title {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 32rpx;
+  line-height: 1.6;
+  color: var(--nero);
+}
+
+.summary {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  line-height: 1.8;
+  color: var(--grigio);
+}
+
+/* ---------- 参数 ---------- */
+
+.block {
+  margin: 16rpx 32rpx 0;
+  padding: 32rpx;
+  background: var(--bianco);
+  border-radius: var(--radius);
+}
+
+.block-title {
+  display: block;
+  margin-bottom: 20rpx;
+  font-size: 26rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}
+
+.param {
+  display: flex;
+  padding: 14rpx 0;
+  border-top: 1rpx solid var(--hairline);
+}
+
+.param:first-of-type {
+  border-top: 0;
+}
+
+/* 名称定宽，值自己换行：参数值长短差很多，不定宽会把表排成锯齿 */
+.param-name {
+  width: 160rpx;
+  flex-shrink: 0;
+  font-size: 26rpx;
+  color: var(--grigio);
+}
+
+.param-value {
+  flex: 1;
+  font-size: 26rpx;
+  line-height: 1.7;
+  color: var(--nero);
+}
+
+/* ---------- 详情图 ---------- */
+
+/* 详情图跟着 .block 的卡片宽度走，与参数卡片左右对齐 */
+.detail-image {
+  display: block;
+  width: 100%;
+}
+
+.detail-image + .detail-image {
+  margin-top: 20rpx;
+}
+
+/* ---------- 页尾 ---------- */
+
+.tail {
+  padding: 48rpx 40rpx;
+  text-align: center;
+}
+
+.tail-text {
+  font-size: 22rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}
+
+/* ---------- 底部操作栏 ---------- */
+
+/* 占位块，高度与 .bar 一致（含安全区），把正文顶上去 */
+.bar-hold {
+  height: 120rpx;
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.bar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  padding: 16rpx 24rpx;
+  /* 全面屏底部的手势条区域，不加这个按钮会贴到屏幕最下沿 */
+  padding-bottom: calc(16rpx + constant(safe-area-inset-bottom));
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+  background: var(--bianco);
+  border-top: 1rpx solid var(--hairline);
+}
+
+.bar-cart {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0 28rpx;
+}
+
+.bar-cart-hover {
+  opacity: 0.72;
+}
+
+.bar-cart-icon {
+  width: 40rpx;
+  height: 40rpx;
+}
+
+.bar-cart-text {
+  margin-top: 4rpx;
+  font-size: 20rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+}
+
+/* 角标不用红色：整个小程序只有黑白灰，红点会是页面上唯一的彩色 */
+.bar-badge {
+  position: absolute;
+  top: -8rpx;
+  right: 8rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32rpx;
+  height: 32rpx;
+  padding: 0 6rpx;
+  box-sizing: border-box;
+  background: var(--nero);
+  border-radius: 999rpx;
+}
+
+.bar-badge-text {
+  font-size: 18rpx;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--su-foto);
+}
+
+/* 两个按钮并排：加购是次级（描边），立即购买是主操作（实心黑）。
+   同为实心的话用户分不清该点哪个，而这两个动作的后果差别很大 */
+.bar-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  height: 84rpx;
+  border: 1rpx solid var(--nero);
+  border-radius: 999rpx;
+}
+
+.bar-add-hover {
+  opacity: 0.72;
+}
+
+.bar-add-text {
+  font-size: 30rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+}
+
+.bar-buy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  height: 84rpx;
+  margin-left: 20rpx;
+  background: var(--nero);
+  border-radius: 999rpx;
+}
+
+.bar-buy-hover {
+  opacity: 0.72;
+}
+
+.bar-buy-text {
+  font-size: 30rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--su-foto);
+}

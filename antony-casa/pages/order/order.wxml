@@ -1,0 +1,114 @@
+<!--order.wxml 订单详情：状态、订单行快照、地址、单号、物流-->
+<view class="page">
+
+  <view class="state" wx:if="{{loading && !order}}">
+    <text class="state-text">加载中…</text>
+  </view>
+
+  <view class="state" wx:elif="{{!order}}">
+    <text class="state-text">订单不存在</text>
+  </view>
+
+  <block wx:else>
+
+    <!-- 状态头 -->
+    <view class="hero">
+      <text class="hero-status">{{order.statusText}}</text>
+      <text class="hero-hint" wx:if="{{order.statusHint}}">{{order.statusHint}}</text>
+    </view>
+
+    <!-- 收货地址快照 -->
+    <view class="card">
+      <view class="addr-head">
+        <text class="addr-receiver">{{order.address.receiver}}</text>
+        <text class="addr-phone">{{order.address.phone}}</text>
+      </view>
+      <text class="addr-detail">{{order.address.province}}{{order.address.city}}{{order.address.district}} {{order.address.detail}}</text>
+    </view>
+
+    <!-- 订单行。全部取自快照 -->
+    <view class="card">
+      <view
+        class="row"
+        wx:for="{{order.items}}"
+        wx:key="productId"
+        data-id="{{item.productId}}"
+        bindtap="onProduct"
+        hover-class="row-hover"
+      >
+        <image class="cover" src="{{item.cover}}" mode="aspectFill" wx:if="{{item.cover}}" />
+        <view class="cover cover-empty" wx:else></view>
+        <view class="row-body">
+          <text class="row-title">{{item.title}}</text>
+          <view class="row-foot">
+            <text class="row-price">¥ {{item.price}}</text>
+            <text class="row-qty">× {{item.quantity}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="total">
+        <text class="total-text">共 {{order.quantity}} 件　合计 ¥ {{order.totalText}}</text>
+      </view>
+    </view>
+
+    <!-- 订单信息 -->
+    <view class="card">
+      <view class="meta" bindtap="onCopyNo">
+        <text class="meta-label">订单号</text>
+        <text class="meta-value">{{order.orderNo}}</text>
+        <text class="meta-copy">复制</text>
+      </view>
+      <view class="meta">
+        <text class="meta-label">下单时间</text>
+        <text class="meta-value">{{order.createdAt}}</text>
+      </view>
+      <view class="meta" wx:if="{{order.paidAt}}">
+        <text class="meta-label">支付时间</text>
+        <text class="meta-value">{{order.paidAt}}</text>
+      </view>
+    </view>
+
+    <!-- 物流。没发货时整块不出现，不显示一片「暂无」 -->
+    <view class="card" wx:if="{{order.shippingText}}">
+      <view class="meta">
+        <text class="meta-label">发货方式</text>
+        <text class="meta-value">{{order.shippingText}}</text>
+      </view>
+      <view class="meta" wx:if="{{order.shipping.company}}">
+        <text class="meta-label">物流公司</text>
+        <text class="meta-value">{{order.shipping.company}}</text>
+      </view>
+      <view class="meta" wx:if="{{order.shipping.trackingNo}}">
+        <text class="meta-label">运单号</text>
+        <text class="meta-value">{{order.shipping.trackingNo}}</text>
+      </view>
+    </view>
+
+    <!-- 退款说明。用户有权知道为什么被退了钱 -->
+    <view class="card" wx:if="{{order.refundReason}}">
+      <view class="meta">
+        <text class="meta-label">退款原因</text>
+        <text class="meta-value">{{order.refundReason}}</text>
+      </view>
+    </view>
+
+    <view class="tail"></view>
+
+    <!-- 待付款才有操作栏。取消是次级（描边），去支付是主操作（实心黑） -->
+    <view class="bar" wx:if="{{order.canCancel}}">
+      <view class="cancel" bindtap="onCancel" hover-class="cancel-hover">
+        <text class="cancel-text">取消订单</text>
+      </view>
+      <view
+        class="pay {{paying ? 'pay-off' : ''}}"
+        bindtap="onPay"
+        hover-class="pay-hover"
+      >
+        <text class="pay-text">{{paying ? '支付中…' : '去支付'}}</text>
+      </view>
+    </view>
+
+  </block>
+
+</view>

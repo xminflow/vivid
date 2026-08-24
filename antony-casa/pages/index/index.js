@@ -2,7 +2,7 @@
 //
 // 文案（品牌标、陈述、展厅名称营业时间）仍写在 mock/home.js；三组图改由后台配，
 // 从 GET /api/home 拉，来源和兜底规则见 utils/homeMedia.js。
-const { brand, about, heroSlides, showroom, activity, shareImage } = require('../../mock/home.js')
+const { brand, about, heroSlides, showroom, activity } = require('../../mock/home.js')
 const homeMedia = require('../../utils/homeMedia.js')
 
 // getWindowInfo 是新基础库的接口，低版本回落到 getSystemInfoSync
@@ -87,7 +87,7 @@ Page({
     return {
       title: 'ANTONY CASA 杭州展厅',
       path: '/pages/index/index',
-      imageUrl: shareImage
+      imageUrl: homeMedia.shareImage()
     }
   }
 })

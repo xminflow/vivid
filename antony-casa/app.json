@@ -2,9 +2,17 @@
   "pages": [
     "pages/index/index",
     "pages/service/service",
+    "pages/shop/shop",
     "pages/mine/mine",
     "pages/booking/booking",
-    "pages/apply/apply"
+    "pages/apply/apply",
+    "pages/product/product",
+    "pages/cart/cart",
+    "pages/checkout/checkout",
+    "pages/orders/orders",
+    "pages/order/order",
+    "pages/address/address",
+    "pages/address-edit/address-edit"
   ],
   "tabBar": {
     "color": "#9B9B9B",
@@ -23,6 +31,12 @@
         "text": "服务",
         "iconPath": "assets/tabbar/service.png",
         "selectedIconPath": "assets/tabbar/service-on.png"
+      },
+      {
+        "pagePath": "pages/shop/shop",
+        "text": "安玺·集",
+        "iconPath": "assets/tabbar/shop.png",
+        "selectedIconPath": "assets/tabbar/shop-on.png"
       },
       {
         "pagePath": "pages/mine/mine",

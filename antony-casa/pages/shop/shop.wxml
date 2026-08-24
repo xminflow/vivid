@@ -1,0 +1,100 @@
+<!--shop.wxml 安玺·集：左分类、右商品-->
+<view class="page">
+
+  <!-- 搜索条。只匹配商品标题，简介和参数搜不到（服务端如此） -->
+  <view class="search">
+    <input
+      class="search-input"
+      value="{{keyword}}"
+      type="text"
+      confirm-type="search"
+      placeholder="搜索商品"
+      placeholder-class="search-holder"
+      bindinput="onKeyword"
+      bindconfirm="onSearch"
+    />
+    <text class="search-clear" wx:if="{{keyword}}" bindtap="onClearKeyword">清除</text>
+    <text class="search-go" bindtap="onSearch">搜索</text>
+  </view>
+
+  <!-- 两栏各自独立滚动。min-height:0 是关键，否则 flex 子项会被内容撑破、整页一起滚 -->
+  <view class="body">
+
+    <scroll-view class="cats" scroll-y enhanced show-scrollbar="{{false}}">
+      <view
+        class="cat {{categoryId === '' ? 'cat-on' : ''}}"
+        data-id=""
+        bindtap="onCategory"
+      >
+        <text class="cat-text">全部</text>
+      </view>
+      <view
+        class="cat {{categoryId === item.id ? 'cat-on' : ''}}"
+        wx:for="{{categories}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="onCategory"
+      >
+        <text class="cat-text">{{item.name}}</text>
+      </view>
+    </scroll-view>
+
+    <scroll-view
+      class="list"
+      scroll-y
+      enhanced
+      show-scrollbar="{{false}}"
+      scroll-top="{{scrollTop}}"
+      refresher-enabled
+      refresher-triggered="{{refreshing}}"
+      bindrefresherrefresh="onRefresh"
+      bindscrolltolower="onScrollToLower"
+    >
+      <view
+        class="row"
+        wx:for="{{items}}"
+        wx:key="id"
+        hover-class="row-hover"
+        hover-stay-time="120"
+        data-id="{{item.id}}"
+        bindtap="onProduct"
+      >
+        <image class="row-cover" src="{{item.cover}}" mode="aspectFill" lazy-load wx:if="{{item.cover}}" />
+        <!-- 拼不出地址 = 服务端没配 COS。留一块占位，不让整行塌掉 -->
+        <view class="row-cover row-cover-empty" wx:else></view>
+
+        <view class="row-body">
+          <text class="row-title">{{item.title}}</text>
+          <text class="row-summary" wx:if="{{item.summary}}">{{item.summary}}</text>
+          <view class="row-foot">
+            <text class="row-price">¥ {{item.price}}</text>
+            <!-- catchtap 而不是 bindtap：整行是跳详情，加号必须把冒泡掐掉，
+                 否则点一次加号会同时加购并跳走 -->
+            <view class="add" data-id="{{item.id}}" catchtap="onAdd" hover-class="add-hover">
+              <text class="add-sign">+</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="empty" wx:if="{{loaded && !items.length}}">
+        <text class="empty-text">{{keyword ? '没有找到相关商品' : '这个分类下还没有商品'}}</text>
+      </view>
+
+      <view class="tail">
+        <text class="tail-text" wx:if="{{loading}}">加载中…</text>
+        <text class="tail-text" wx:elif="{{items.length && items.length >= total}}">已经到底了</text>
+      </view>
+    </scroll-view>
+
+  </view>
+
+  <!-- 悬浮购物车。角标是件数，0 件时不出角标但入口一直在 -->
+  <view class="cart-fab" bindtap="onCart" hover-class="cart-fab-hover">
+    <image class="cart-icon" src="/assets/shop/cart.png" mode="aspectFit" />
+    <view class="cart-badge" wx:if="{{cartQuantity > 0}}">
+      <text class="cart-badge-text">{{cartQuantity > 99 ? '99+' : cartQuantity}}</text>
+    </view>
+  </view>
+
+</view>

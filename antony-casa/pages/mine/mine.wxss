@@ -170,6 +170,42 @@
   color: var(--nero);
 }
 
+/* 安玺·集的两个入口。和 .sec-head 长一样，但它们是**跳走**不是展开，
+   所以记号不转向——转了会让人以为点了会在原地展开 */
+.link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 26rpx;
+  border-bottom: 1rpx solid var(--hairline);
+}
+
+/* 间隔跟 .sec + .sec 取同一个值，这两条入口才和上面四栏是同一种行；
+   小于 88rpx 会让收货地址那一格看着比上面几格矮一截（或多出一块留白） */
+.link + .link {
+  margin-top: 88rpx;
+}
+
+.link-hover {
+  opacity: 0.5;
+}
+
+.link-title {
+  font-size: 30rpx;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: var(--ls-meta);
+  color: var(--nero);
+}
+
+.link-mark {
+  flex: none;
+  margin-left: 20rpx;
+  font-size: 30rpx;
+  line-height: 1;
+  color: var(--grigio-chiaro);
+}
+
 /* 收起指右，展开转成指下。没有这个记号，四行标题看着像四个死标签 */
 .sec-mark {
   flex: none;
@@ -405,19 +441,6 @@
   line-height: 1.5;
   letter-spacing: var(--ls-meta);
   color: var(--grigio);
-}
-
-/* 状态只有一档，做成描边小签，不用颜色区分 */
-.rec-state {
-  flex: none;
-  margin-left: 24rpx;
-  padding: 6rpx 16rpx;
-  font-size: 21rpx;
-  line-height: 1.5;
-  letter-spacing: var(--ls-meta);
-  color: var(--grigio);
-  border: 1rpx solid var(--hairline);
-  border-radius: 6rpx;
 }
 
 /* ---------- 空态 ---------- */

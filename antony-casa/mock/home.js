@@ -5,8 +5,8 @@
 // 配置、或后台把某一组清空了，才会用到这里的值。改图请去后台「首页图片」页，
 // 改这里只影响兜底。合并规则见 utils/homeMedia.js。
 //
-// 文案（brand / about / showroom 的名称营业时间 / shareImage）仍然只有这一份，
-// 后台不管，改了要发版。
+// 文案（brand / about / showroom 的名称营业时间）仍然只有这一份，后台不管，
+// 改了要发版。
 //
 // 图存在 COS 上不进包（见 utils/config.js 的 STATIC_BASE）。换兜底图就换掉
 // assets/home/ 下的同名文件，跑一次 server/scripts/upload_static.py 覆盖上去
@@ -24,7 +24,9 @@ const about = {
   body: '提供一站式高端家居解决方案，从空间设计到实景落地全程把控'
 }
 
-// 顶部画廊：只放实拍，不压字
+// 顶部画廊：只放实拍，不压字。
+// 第一张同时是各页转发卡片的配图（见 utils/homeMedia.js 的 shareImage），所以它还要
+// 经得住微信 5:4 居中裁剪、最短边不小于 300px——hero-01 是 1920x1440，够用
 const heroSlides = [
   { image: `${STATIC_BASE}/home/hero-01.jpg` },
   { image: `${STATIC_BASE}/home/hero-02.jpg` },
@@ -54,10 +56,4 @@ const activity = {
   image: `${STATIC_BASE}/home/activity.jpg`
 }
 
-// 转发卡片的配图。不指定 imageUrl 的话微信拿当前页面截图顶上，截到的可能是
-// 轮播随机某一张、也可能赶上图还没加载完的空白，卡片长什么样完全不可控。
-// 各页共用同一张，保证转出去的卡片是同一个品牌形象。
-// 微信按 5:4 裁剪，最短边不小于 300px——hero-01 是 1920x1440，够用
-const shareImage = `${STATIC_BASE}/home/hero-01.jpg`
-
-module.exports = { brand, about, heroSlides, showroom, activity, shareImage }
+module.exports = { brand, about, heroSlides, showroom, activity }

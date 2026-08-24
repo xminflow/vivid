@@ -4,8 +4,11 @@
 // 小程序端不持有任何密钥——包能被反编译，密钥打进客户端等于把桶公开。
 // 图片字节不经服务端中转，省带宽也省一次落盘。
 //
-// ⚠️ COS 域名要加进小程序后台的 request 合法域名，否则真机上传会被拦：
-//    https://antony-casa-dev-1327365963.cos.ap-shanghai.myqcloud.com
+// ⚠️ COS 域名要加进小程序后台的 request 合法域名，否则真机上传会被拦。
+// 直传地址由服务端按它自己的 COS_BUCKET 现签，所以**两个桶都要加**——
+// 开发版打到本地/开发后端时签的是开发桶，正式版打到生产后端时签的是生产桶：
+//    https://antonycasa-pro-1327365963.cos.ap-shanghai.myqcloud.com   （生产）
+//    https://antony-casa-dev-1327365963.cos.ap-shanghai.myqcloud.com  （开发）
 
 const { send } = require('./http.js')
 

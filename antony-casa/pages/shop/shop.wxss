@@ -1,0 +1,276 @@
+/* shop.wxss 安玺·集：左分类、右商品，两栏各自滚动 */
+
+/* 整页不滚，滚动发生在两个 scroll-view 里。所以页面高度必须锁死成一屏，
+   而不是 min-height——用 min-height 的话内容一多整页跟着滚，左栏就跑没了 */
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--sfondo);
+}
+
+/* ---------- 搜索 ---------- */
+
+.search {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin: 20rpx 24rpx;
+  padding: 0 24rpx;
+  background: var(--bianco);
+  border-radius: var(--radius);
+}
+
+.search-input {
+  flex: 1;
+  height: 72rpx;
+  font-size: 28rpx;
+  color: var(--nero);
+}
+
+.search-holder {
+  color: var(--grigio-chiaro);
+}
+
+.search-clear,
+.search-go {
+  padding-left: 20rpx;
+  font-size: 26rpx;
+  letter-spacing: var(--ls-meta);
+}
+
+.search-clear {
+  color: var(--grigio-chiaro);
+}
+
+.search-go {
+  color: var(--nero);
+}
+
+/* ---------- 两栏 ---------- */
+
+.body {
+  display: flex;
+  flex: 1;
+  /* flex 子项默认 min-height:auto，会被内容撑破导致整页滚动。
+     这一行是左右分栏能各自滚动的前提，删了就散 */
+  min-height: 0;
+}
+
+/* ---------- 左：分类 ---------- */
+
+.cats {
+  flex-shrink: 0;
+  width: 180rpx;
+  height: 100%;
+  background: var(--sfondo);
+}
+
+.cat {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 108rpx;
+  padding: 20rpx 16rpx 20rpx 24rpx;
+}
+
+.cat-text {
+  font-size: 26rpx;
+  line-height: 1.4;
+  color: var(--grigio);
+}
+
+/* 选中项用白底，和右栏的白连成一片——这是「当前在这一类里」最直白的表达，
+   比换字色管用。左侧再压一条墨色竖条做锚点 */
+.cat-on {
+  background: var(--bianco);
+}
+
+.cat-on::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 6rpx;
+  height: 36rpx;
+  margin-top: -18rpx;
+  background: var(--nero);
+  content: '';
+}
+
+.cat-on .cat-text {
+  font-weight: 600;
+  color: var(--nero);
+}
+
+/* ---------- 右：商品 ---------- */
+
+.list {
+  flex: 1;
+  height: 100%;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+  background: var(--bianco);
+}
+
+.row {
+  display: flex;
+  padding: 28rpx 0;
+  border-bottom: 1rpx solid var(--hairline);
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.row-hover {
+  opacity: 0.72;
+}
+
+.row-cover {
+  flex-shrink: 0;
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 12rpx;
+}
+
+.row-cover-empty {
+  background: var(--sfondo);
+}
+
+/* min-width:0 让长标题能正常截断，否则 flex 子项按内容宽度撑开、把加号挤出屏幕 */
+.row-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  padding-left: 20rpx;
+}
+
+.row-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 30rpx;
+  line-height: 1.4;
+  color: var(--nero);
+}
+
+.row-summary {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: var(--grigio-chiaro);
+}
+
+/* 价格和加号压在行底：图是 180rpx 高，这样两边视觉上对齐 */
+.row-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: auto;
+}
+
+.row-price {
+  font-size: 32rpx;
+  font-weight: 600;
+  letter-spacing: var(--ls-display);
+  color: var(--nero);
+}
+
+.add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56rpx;
+  height: 56rpx;
+  background: var(--nero);
+  border-radius: 50%;
+}
+
+.add-hover {
+  opacity: 0.72;
+}
+
+.add-sign {
+  font-size: 36rpx;
+  line-height: 1;
+  color: var(--su-foto);
+}
+
+/* ---------- 空态与页尾 ---------- */
+
+.empty {
+  padding: 160rpx 24rpx;
+  text-align: center;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: var(--grigio-chiaro);
+}
+
+.tail {
+  padding: 32rpx 24rpx 48rpx;
+  text-align: center;
+}
+
+.tail-text {
+  font-size: 24rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+}
+
+/* ---------- 悬浮购物车 ---------- */
+
+.cart-fab {
+  position: fixed;
+  right: 32rpx;
+  bottom: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96rpx;
+  height: 96rpx;
+  background: var(--nero);
+  border-radius: 50%;
+  box-shadow: 0 6rpx 24rpx rgba(17, 17, 17, 0.22);
+}
+
+.cart-fab-hover {
+  opacity: 0.8;
+}
+
+.cart-icon {
+  width: 48rpx;
+  height: 48rpx;
+}
+
+/* 角标不用红色：整个小程序只有黑白灰，红点会是页面上唯一的彩色，
+   喧宾夺主。白底墨字压在黑圆上，对比度已经够醒目 */
+.cart-badge {
+  position: absolute;
+  top: -6rpx;
+  right: -6rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36rpx;
+  height: 36rpx;
+  padding: 0 8rpx;
+  box-sizing: border-box;
+  background: var(--bianco);
+  border: 2rpx solid var(--nero);
+  border-radius: 999rpx;
+}
+
+.cart-badge-text {
+  font-size: 20rpx;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--nero);
+}

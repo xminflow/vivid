@@ -9,7 +9,7 @@
 // 走哪条由 config.js 的 API_MODE 决定。COS 直传不走这里：那是外部域名的
 // 绝对地址，三种模式下都得用 wx.request 直发（见 upload.js）。
 
-const { API_MODE, CLOUD, API_BASE, SERVER_BASE } = require('./config.js')
+const { API_MODE, CLOUD, HTTP_BASE } = require('./config.js')
 
 // 初始化只做一次。放在这里而不是 app.js：请求方是这一层，由它自己保证前置条件，
 // 就不用担心页面请求早于 onLaunch 的时序问题。
@@ -77,15 +77,13 @@ function sendByCloud(options) {
     .then(res => ({ statusCode: res.statusCode, data: res.data || {} }))
 }
 
-// server 和 local 都走 wx.request，区别只在打哪个地址
-function baseUrl() {
-  return API_MODE === 'server' ? SERVER_BASE : API_BASE
-}
+// server 和 local 都走 wx.request，区别只在打哪个地址。
+// 具体是生产还是开发域名由 config.js 按 envVersion 定完了，这里不再判断
 
 function sendByRequest(options) {
   return new Promise((resolve, reject) => {
     wx.request({
-      url: `${baseUrl()}${options.url}`,
+      url: `${HTTP_BASE}${options.url}`,
       method: options.method || 'GET',
       header: options.header,
       data: options.data,

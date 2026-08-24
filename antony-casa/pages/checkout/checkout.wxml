@@ -1,0 +1,56 @@
+<!--checkout.wxml 结算：选地址、核对订单行、提交-->
+<view class="page">
+
+  <view class="state" wx:if="{{loading}}">
+    <text class="state-text">加载中…</text>
+  </view>
+
+  <block wx:else>
+    <scroll-view class="body" scroll-y enhanced show-scrollbar="{{false}}">
+
+      <!-- 收货地址。没选中时是一条提示，点进地址簿 -->
+      <view class="card addr" bindtap="onPickAddress" hover-class="addr-hover">
+        <block wx:if="{{address}}">
+          <view class="addr-head">
+            <text class="addr-receiver">{{address.receiver}}</text>
+            <text class="addr-phone">{{address.phone}}</text>
+          </view>
+          <text class="addr-detail">{{address.province}}{{address.city}}{{address.district}} {{address.detail}}</text>
+        </block>
+        <text class="addr-empty" wx:else>请选择收货地址</text>
+        <text class="arrow">›</text>
+      </view>
+
+      <!-- 订单行。金额此刻只作展示，最终以服务端重算的为准 -->
+      <view class="card">
+        <view class="row" wx:for="{{items}}" wx:key="productId">
+          <image class="cover" src="{{item.cover}}" mode="aspectFill" wx:if="{{item.cover}}" />
+          <view class="cover cover-empty" wx:else></view>
+          <view class="row-body">
+            <text class="row-title">{{item.title}}</text>
+            <view class="row-foot">
+              <text class="row-price">¥ {{item.price}}</text>
+              <text class="row-qty">× {{item.quantity}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="tail"></view>
+    </scroll-view>
+
+    <view class="bar">
+      <view class="bar-sum">
+        <text class="bar-total">合计 ¥ {{totalText}}</text>
+      </view>
+      <view
+        class="submit {{submitting ? 'submit-off' : ''}}"
+        bindtap="onSubmit"
+        hover-class="submit-hover"
+      >
+        <text class="submit-text">{{submitting ? '提交中…' : '提交订单'}}</text>
+      </view>
+    </view>
+  </block>
+
+</view>

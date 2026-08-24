@@ -1,0 +1,207 @@
+/* orders.wxss 我的订单：吸顶 tab + 白卡列表 */
+
+.page {
+  min-height: 100vh;
+  padding-bottom: 40rpx;
+  background: var(--sfondo);
+}
+
+/* ---------- 状态 tab ---------- */
+
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  background: var(--bianco);
+  border-bottom: 1rpx solid var(--hairline);
+}
+
+.tab {
+  flex: 1;
+  padding: 26rpx 0;
+  text-align: center;
+}
+
+.tab-text {
+  font-size: 28rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+}
+
+.tab-on .tab-text {
+  font-weight: 600;
+  color: var(--nero);
+}
+
+/* ---------- 空态 / 加载态 ---------- */
+
+.state {
+  padding: 200rpx 40rpx;
+  text-align: center;
+}
+
+.state-text {
+  display: block;
+  font-size: 28rpx;
+  color: var(--grigio-chiaro);
+}
+
+.state-go {
+  display: inline-block;
+  margin-top: 32rpx;
+  padding: 16rpx 48rpx;
+  background: var(--nero);
+  border-radius: 999rpx;
+}
+
+.state-go-hover {
+  opacity: 0.72;
+}
+
+.state-go-text {
+  font-size: 26rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--su-foto);
+}
+
+/* ---------- 订单卡 ---------- */
+
+.card {
+  margin: 24rpx 32rpx 0;
+  background: var(--bianco);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 32rpx;
+  border-bottom: 1rpx solid var(--hairline);
+}
+
+.no {
+  font-size: 24rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio);
+}
+
+.status {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--nero);
+}
+
+.lines {
+  padding: 24rpx 32rpx 8rpx;
+}
+
+.lines-hover {
+  background: rgba(17, 17, 17, 0.03);
+}
+
+.line {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.cover {
+  width: 120rpx;
+  height: 120rpx;
+  flex: none;
+  border-radius: 8rpx;
+  background: var(--sfondo);
+}
+
+.cover-empty {
+  background: var(--sfondo);
+}
+
+.line-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-left: 20rpx;
+}
+
+.line-title {
+  flex: 1;
+  font-size: 26rpx;
+  line-height: 1.5;
+  color: var(--nero);
+}
+
+.line-qty {
+  margin-left: 16rpx;
+  font-size: 24rpx;
+  color: var(--grigio);
+}
+
+.card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 32rpx 24rpx;
+}
+
+.sum {
+  font-size: 26rpx;
+  color: var(--nero);
+}
+
+.ops {
+  display: flex;
+  align-items: center;
+}
+
+.op {
+  margin-left: 20rpx;
+  padding: 12rpx 28rpx;
+  border: 1rpx solid var(--hairline);
+  border-radius: 999rpx;
+}
+
+.op-text {
+  font-size: 24rpx;
+  color: var(--grigio);
+}
+
+.op-main {
+  border-color: var(--nero);
+}
+
+.op-main-text {
+  font-size: 24rpx;
+  color: var(--nero);
+}
+
+/* 待付款那一行的主操作。实心黑，和旁边描边的「取消」拉开——
+   这两个动作的后果差别很大，同为描边会让人点错 */
+.op-pay {
+  background: var(--nero);
+  border-color: var(--nero);
+}
+
+.op-pay-off {
+  opacity: 0.4;
+}
+
+.op-pay-text {
+  font-size: 24rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--su-foto);
+}
+
+.more {
+  padding: 32rpx;
+  text-align: center;
+}
+
+.more-text {
+  font-size: 24rpx;
+  color: var(--grigio-chiaro);
+}

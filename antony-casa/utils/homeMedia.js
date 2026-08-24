@@ -13,8 +13,8 @@
 // 代价说明：缓存兜底意味着断网时用户可能看到的是上一次的旧图。这是刻意的取舍，
 // 换的是首页永远不空白；每次拉取失败都会打 error 日志，不会悄悄咽掉。
 
-// 只接管三组图。文案和转发卡片配图仍在 mock/home.js：转发图是各页共用的同一张
-// 品牌形象（见那边的注释），不该只有首页跟着后台配置变
+// 只接管三组图，文案仍在 mock/home.js。转发卡片配图不单列一项，直接复用 hero 首图：
+// 各页共用同一张品牌形象这点不变，只是这张图现在也跟着后台配置走（见下面的 shareImage）
 const { send } = require('./http.js')
 const { heroSlides, showroom, activity } = require('../mock/home.js')
 
@@ -100,4 +100,22 @@ function refresh() {
   })
 }
 
-module.exports = { local, refresh }
+/**
+ * 转发卡片的配图：首页画廊的第一张，各页共用。
+ *
+ * 不指定 imageUrl 的话微信拿当前页面截图顶上，截到的可能是轮播随机某一张、也可能
+ * 赶上图还没加载完的空白，卡片长什么样完全不可控，所以每个页面都要显式给一张。
+ *
+ * 只读缓存、不发请求：onShareAppMessage 必须同步返回，等不了网络。没缓存时
+ * （用户冷启动直接进了非首页，还没人拉过 /api/home）用包内默认首图，就是后台
+ * 配图之前的那张，卡片不会开天窗。
+ *
+ * ⚠️ 微信按 5:4 居中裁剪、最短边不小于 300px。后台换首图会连带换掉所有页面的
+ * 分享卡片，上传时要考虑裁成 5:4 之后画面还成不成立。
+ */
+function shareImage() {
+  const cached = readCache()
+  return pickList(cached && cached.hero, DEFAULTS.hero)[0]
+}
+
+module.exports = { local, refresh, shareImage }

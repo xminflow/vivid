@@ -1,0 +1,101 @@
+<!--cart.wxml 购物车：勾选、改数量、删除、清理失效-->
+<view class="page">
+
+  <view class="state" wx:if="{{loading && !items.length}}">
+    <text class="state-text">加载中…</text>
+  </view>
+
+  <view class="state" wx:elif="{{!items.length}}">
+    <text class="state-text">购物车是空的</text>
+    <view class="state-go" bindtap="onGoShopping" hover-class="state-go-hover">
+      <text class="state-go-text">去逛逛</text>
+    </view>
+  </view>
+
+  <block wx:else>
+    <!-- 失效条提示条。只在真有失效商品时出现 -->
+    <view class="invalid-bar" wx:if="{{hasInvalid}}">
+      <text class="invalid-text">部分商品已下架</text>
+      <text class="invalid-go" bindtap="onClearInvalid">清理</text>
+    </view>
+
+    <scroll-view class="list" scroll-y enhanced show-scrollbar="{{false}}">
+      <view class="row {{item.available ? '' : 'row-off'}}" wx:for="{{items}}" wx:key="id">
+
+        <!-- 勾选框。失效行点不动，所以整块不绑事件时靠 row-off 把它压灰 -->
+        <view class="tick" data-id="{{item.id}}" bindtap="onToggle">
+          <view class="tick-box {{item.checked ? 'tick-on' : ''}}">
+            <text class="tick-sign" wx:if="{{item.checked}}">✓</text>
+          </view>
+        </view>
+
+        <image
+          class="cover"
+          src="{{item.cover}}"
+          mode="aspectFill"
+          lazy-load
+          wx:if="{{item.cover}}"
+          data-id="{{item.id}}"
+          bindtap="onProduct"
+        />
+        <view class="cover cover-empty" wx:else></view>
+
+        <view class="body">
+          <text class="title" data-id="{{item.id}}" bindtap="onProduct">{{item.title}}</text>
+          <text class="off-tag" wx:if="{{!item.available}}">已下架</text>
+
+          <view class="foot">
+            <text class="price">¥ {{item.price}}</text>
+
+            <view class="stepper" wx:if="{{item.available}}">
+              <view
+                class="step {{item.quantity <= 1 ? 'step-off' : ''}}"
+                data-id="{{item.id}}"
+                data-step="-1"
+                bindtap="onStep"
+              >−</view>
+              <text class="step-num">{{item.quantity}}</text>
+              <view
+                class="step {{item.quantity >= 99 ? 'step-off' : ''}}"
+                data-id="{{item.id}}"
+                data-step="1"
+                bindtap="onStep"
+              >+</view>
+            </view>
+
+            <text class="remove" data-id="{{item.id}}" bindtap="onRemove">删除</text>
+          </view>
+        </view>
+
+      </view>
+
+      <!-- 底部操作栏是 fixed 的，列表尾部要留出等高的空白，否则最后一行被压住 -->
+      <view class="list-tail"></view>
+    </scroll-view>
+
+    <view class="bar">
+      <view class="bar-all" bindtap="onToggleAll">
+        <view class="tick-box {{allSelected ? 'tick-on' : ''}}">
+          <text class="tick-sign" wx:if="{{allSelected}}">✓</text>
+        </view>
+        <text class="bar-all-text">全选</text>
+      </view>
+
+      <view class="bar-sum">
+        <text class="bar-total">合计 ¥ {{totalText}}</text>
+        <text class="bar-count">已选 {{selectedCount}} 件</text>
+      </view>
+
+      <!-- 一件都没勾时压灰但仍可点：点了给一句「请先选择商品」，
+           比一个完全没反应的按钮更容易理解 -->
+      <view
+        class="checkout {{selectedCount ? '' : 'checkout-off'}}"
+        bindtap="onCheckout"
+        hover-class="checkout-hover"
+      >
+        <text class="checkout-text">结算</text>
+      </view>
+    </view>
+  </block>
+
+</view>

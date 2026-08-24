@@ -1,6 +1,6 @@
 // 服务：五个服务各自成卡，点进去是该服务的申请表单
 const { services } = require('../../mock/service.js')
-const { shareImage } = require('../../mock/home.js')
+const homeMedia = require('../../utils/homeMedia.js')
 
 Page({
   data: {
@@ -15,7 +15,7 @@ Page({
     return {
       title: 'ANTONY CASA · 全案设计服务',
       path: '/pages/service/service',
-      imageUrl: shareImage
+      imageUrl: homeMedia.shareImage()
     }
   }
 })

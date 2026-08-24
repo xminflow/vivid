@@ -3,17 +3,10 @@ const profileStore = require('../../utils/profile.js')
 const appointments = require('../../utils/appointments.js')
 const { uploadImage } = require('../../utils/upload.js')
 const { advisor, genders } = require('../../mock/mine.js')
-const { brand, shareImage } = require('../../mock/home.js')
+const { brand } = require('../../mock/home.js')
+const homeMedia = require('../../utils/homeMedia.js')
 
 const BIRTHDAY_START = '1930-01-01'
-
-// 库里存的是状态码，页面要给人话
-const STATE_TEXT = {
-  new: '待确认',
-  confirmed: '已确认',
-  visited: '已到访',
-  cancelled: '已取消'
-}
 
 function todayStr() {
   const d = new Date()
@@ -118,8 +111,7 @@ Page({
     this.setData({
       records: rows.map(r => ({
         ...r,
-        dateText: formatDate(r.visitDate),
-        stateText: STATE_TEXT[r.status] || '待确认'
+        dateText: formatDate(r.visitDate)
       }))
     })
   },
@@ -225,11 +217,21 @@ Page({
     })
   },
 
+  // ---------- 安玺·集 ----------
+
+  onOrders() {
+    wx.navigateTo({ url: '/pages/orders/orders' })
+  },
+
+  onAddresses() {
+    wx.navigateTo({ url: '/pages/address/address' })
+  },
+
   onShareAppMessage() {
     return {
       title: 'ANTONY CASA 杭州展厅',
       path: '/pages/index/index',
-      imageUrl: shareImage
+      imageUrl: homeMedia.shareImage()
     }
   }
 })

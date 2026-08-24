@@ -1,0 +1,107 @@
+/* address-edit.wxss 地址表单：白卡分组 + 底部固定保存 */
+
+.page {
+  min-height: 100vh;
+  padding: 24rpx 32rpx 200rpx;
+  box-sizing: border-box;
+  background: var(--sfondo);
+}
+
+.card {
+  margin-bottom: 24rpx;
+  padding: 0 32rpx;
+  background: var(--bianco);
+  border-radius: var(--radius);
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  min-height: 104rpx;
+  border-bottom: 1rpx solid var(--hairline);
+}
+
+.field:last-child {
+  border-bottom: none;
+}
+
+.field-area {
+  align-items: flex-start;
+  padding: 28rpx 0;
+}
+
+.field-switch {
+  justify-content: space-between;
+}
+
+.label {
+  width: 160rpx;
+  flex: none;
+  font-size: 28rpx;
+  color: var(--nero);
+}
+
+.input {
+  flex: 1;
+  font-size: 28rpx;
+  color: var(--nero);
+}
+
+.textarea {
+  flex: 1;
+  min-height: 88rpx;
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: var(--nero);
+}
+
+.ph {
+  color: var(--grigio-chiaro);
+}
+
+.arrow {
+  margin-left: 12rpx;
+  font-size: 32rpx;
+  color: var(--grigio-chiaro);
+}
+
+.hint {
+  display: block;
+  padding: 0 0 24rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: var(--grigio-chiaro);
+}
+
+/* ---------- 底部固定保存 ---------- */
+
+.bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 20rpx 32rpx calc(20rpx + env(safe-area-inset-bottom));
+  background: var(--bianco);
+  border-top: 1rpx solid var(--hairline);
+}
+
+.save {
+  padding: 24rpx 0;
+  text-align: center;
+  background: var(--nero);
+  border-radius: 999rpx;
+}
+
+.save-hover {
+  opacity: 0.72;
+}
+
+.save-off {
+  opacity: 0.4;
+}
+
+.save-text {
+  font-size: 28rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--su-foto);
+}

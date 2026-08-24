@@ -1,0 +1,79 @@
+<!--orders.wxml 我的订单：状态 tab + 卡片列表-->
+<view class="page">
+
+  <view class="tabs">
+    <view
+      class="tab {{active === item.key ? 'tab-on' : ''}}"
+      wx:for="{{tabs}}"
+      wx:key="key"
+      data-key="{{item.key}}"
+      bindtap="onTab"
+    >
+      <text class="tab-text">{{item.text}}</text>
+    </view>
+  </view>
+
+  <view class="state" wx:if="{{loading && !items.length}}">
+    <text class="state-text">加载中…</text>
+  </view>
+
+  <view class="state" wx:elif="{{!items.length}}">
+    <text class="state-text">还没有订单</text>
+    <view class="state-go" bindtap="onGoShopping" hover-class="state-go-hover">
+      <text class="state-go-text">去逛逛</text>
+    </view>
+  </view>
+
+  <block wx:else>
+    <view class="card" wx:for="{{items}}" wx:key="id">
+
+      <view class="card-head" data-id="{{item.id}}" bindtap="onOrder">
+        <text class="no">{{item.orderNo}}</text>
+        <text class="status">{{item.statusText}}</text>
+      </view>
+
+      <view class="lines" data-id="{{item.id}}" bindtap="onOrder" hover-class="lines-hover">
+        <view class="line" wx:for="{{item.preview}}" wx:for-item="line" wx:key="productId">
+          <image class="cover" src="{{line.cover}}" mode="aspectFill" lazy-load wx:if="{{line.cover}}" />
+          <view class="cover cover-empty" wx:else></view>
+          <view class="line-body">
+            <text class="line-title">{{line.title}}</text>
+            <text class="line-qty">× {{line.quantity}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="card-foot">
+        <text class="sum">共 {{item.quantity}} 件　合计 ¥ {{item.totalText}}</text>
+        <view class="ops">
+          <view class="op" data-id="{{item.id}}" bindtap="onCancel" wx:if="{{item.canPay}}">
+            <text class="op-text">取消</text>
+          </view>
+
+          <!-- 待付款的单直接给「去支付」，省掉「进详情再点一次」这一步 -->
+          <block wx:if="{{item.canPay}}">
+            <view
+              class="op op-pay {{payingId === item.id ? 'op-pay-off' : ''}}"
+              data-id="{{item.id}}"
+              bindtap="onPay"
+            >
+              <text class="op-pay-text">{{payingId === item.id ? '支付中…' : '去支付'}}</text>
+            </view>
+          </block>
+          <view class="op op-main" data-id="{{item.id}}" bindtap="onOrder" wx:else>
+            <text class="op-main-text">查看详情</text>
+          </view>
+        </view>
+      </view>
+
+    </view>
+
+    <view class="more" wx:if="{{loading}}">
+      <text class="more-text">加载中…</text>
+    </view>
+    <view class="more" wx:elif="{{!hasMore}}">
+      <text class="more-text">没有更多了</text>
+    </view>
+  </block>
+
+</view>
