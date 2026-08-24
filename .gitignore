@@ -32,3 +32,9 @@ miniprogram_npm/
 Thumbs.db
 .idea/
 .vscode/
+
+# 本机跑服务留下的日志与临时输出，只对当次调试有意义
+.scratch/
+logs/
+*.log
+*.err
