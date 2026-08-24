@@ -4,7 +4,7 @@
  * ⚠️ 同步要求：这些值必须与下面四处**逐字一致**，改一处就要改到位，
  *    否则后台会把正常数据显示成原始 id：
  *      1. server/schema.sql 的 CHECK 约束
- *      2. server/app/models.py 的 VISITOR_TYPES / PURPOSES / SERVICE_IDS / *_STATUSES
+ *      2. server/app/models.py 的 VISITOR_TYPES / PURPOSES / SERVICE_IDS
  *      3. antony-casa/mock/*.js 与 pages/booking/booking.js 的同名常量（小程序）
  *      4. antony-web/src/features/booking/content.ts 的同名常量（官网）
  *
@@ -14,7 +14,14 @@
  *    没登记的字段不会被隐藏，页面直接显示原始 id，避免运营漏看客户填的内容。
  */
 
-import type { AppointmentStatus, ServiceApplicationStatus, ServiceId } from './types'
+import type { StatusMeta } from '@/components/status-badge'
+
+import type {
+  OrderStatus,
+  PaymentAnomalyKind,
+  PaymentAnomalySource,
+  ServiceId,
+} from './types'
 
 export const VISITOR_TYPES = ['业主', '设计师', '地产圈', '家居圈', '酒店民宿圈', '艺术圈'] as const
 
@@ -26,26 +33,6 @@ export const PURPOSES = [
   '商务合作',
   '其他',
 ] as const
-
-/** tone 决定徽标配色：待跟进的要显眼，已完成、已取消的要淡 */
-export interface StatusOption<T extends string> {
-  value: T
-  label: string
-  tone: 'pending' | 'active' | 'done' | 'muted'
-}
-
-export const APPOINTMENT_STATUSES: StatusOption<AppointmentStatus>[] = [
-  { value: 'new', label: '待跟进', tone: 'pending' },
-  { value: 'confirmed', label: '已确认', tone: 'active' },
-  { value: 'visited', label: '已到店', tone: 'done' },
-  { value: 'cancelled', label: '已取消', tone: 'muted' },
-]
-
-export const SERVICE_STATUSES: StatusOption<ServiceApplicationStatus>[] = [
-  { value: 'new', label: '待联系', tone: 'pending' },
-  { value: 'contacted', label: '已联系', tone: 'active' },
-  { value: 'closed', label: '已关闭', tone: 'muted' },
-]
 
 export const SERVICES: { value: ServiceId; label: string }[] = [
   { value: 'design', label: '全案设计服务' },
@@ -94,13 +81,6 @@ export const UPLOAD_LABELS: Record<string, string> = {
 export const serviceLabel = (id: string): string =>
   SERVICES.find((s) => s.value === id)?.label ?? id
 
-export function statusMeta<T extends string>(
-  options: StatusOption<T>[],
-  value: string,
-): StatusOption<string> {
-  return options.find((s) => s.value === value) ?? { value, label: value, tone: 'muted' }
-}
-
 /** 未登记的字段照原样显示 id，宁可难看也不能把客户填的内容藏起来 */
 export const fieldLabel = (id: string): string => FIELD_LABELS[id]?.label ?? id
 
@@ -110,3 +90,101 @@ export const fieldValue = (id: string, value: string): string => {
 }
 
 export const uploadLabel = (id: string): string => UPLOAD_LABELS[id] ?? id
+
+/* ---------------------------------------------------------------- 订单 */
+
+/**
+ * 订单状态。值必须与 server/app/models.py 的 ORDER_STATUSES、
+ * schema.sql 的 shop_orders.status CHECK、以及小程序
+ * pages/orders/orders.js 的 STATUS_TEXT 逐字一致——改一处要改四处。
+ * 不一致的后果是后台筛选永远筛出空列表。
+ */
+export const ORDER_STATUSES = [
+  { value: 'pending_pay', label: '待付款' },
+  { value: 'pending_ship', label: '待发货' },
+  { value: 'pending_receive', label: '待收货' },
+  { value: 'completed', label: '已完成' },
+  { value: 'closed', label: '已关闭' },
+  { value: 'refunded', label: '已退款' },
+] as const
+
+/**
+ * 徽标配色只表达「要不要处理」：待付款是等客户、待发货是**等我们**，
+ * 所以只有待发货给显眼色。已完成收敛，关闭和退款压灰。
+ */
+export const ORDER_STATUS_META: Record<OrderStatus, StatusMeta> = {
+  pending_pay: { label: '待付款', tone: 'muted' },
+  pending_ship: { label: '待发货', tone: 'pending' },
+  pending_receive: { label: '待收货', tone: 'active' },
+  completed: { label: '已完成', tone: 'done' },
+  closed: { label: '已关闭', tone: 'muted' },
+  refunded: { label: '已退款', tone: 'muted' },
+}
+
+export const ORDER_SOURCES = [
+  { value: 'cart', label: '购物车' },
+  { value: 'direct', label: '立即购买' },
+] as const
+
+/** 三档发货方式。卖家具走专线或自送时没有运单号，后两档是刚需 */
+export const SHIPPING_TYPES = [
+  { value: 'express', label: '快递发货' },
+  { value: 'local', label: '同城配送' },
+  { value: 'none', label: '无需物流' },
+] as const
+
+/* ---------------------------------------------------------------- 支付异常 */
+
+/**
+ * 三种异常的名字与「这到底是什么事」。
+ *
+ * 提示语写得长一点是有意的：运营看到这一行时，手里只有一个订单号和一笔已经到账
+ * 的钱，需要知道下一步该去哪儿查。写「金额不符」四个字等于没说。
+ */
+export const ANOMALY_KINDS = [
+  { value: 'amount_mismatch', label: '金额不符' },
+  { value: 'order_not_found', label: '订单不存在' },
+  { value: 'missing_transaction_id', label: '缺支付单号' },
+] as const
+
+export const ANOMALY_KIND_LABEL: Record<PaymentAnomalyKind, string> = {
+  amount_mismatch: '金额不符',
+  order_not_found: '订单不存在',
+  missing_transaction_id: '缺支付单号',
+}
+
+export const ANOMALY_KIND_HINT: Record<PaymentAnomalyKind, string> = {
+  amount_mismatch:
+    '微信收到的金额与订单金额不一致，订单没有被置为已支付。要么建单时算错了，要么金额在中间被改过。' +
+    '拿微信支付单号去商户平台核对实际到账金额，再决定是补单还是原路退回。',
+  order_not_found:
+    '收到一笔支付成功，但这个商户订单号在我们库里不存在——钱收了却对不上任何订单。' +
+    '先确认这个单号是不是别的环境（开发/生产共用同一个商户号）发出去的，' +
+    '再去商户平台看这笔钱的去向。',
+  missing_transaction_id:
+    '微信说支付成功却没给支付单号。没有它就没法保证不重复入账，所以这笔支付被挂起、订单仍是待付款。' +
+    '去商户平台按订单号查到真实的支付单号，再人工处理。',
+}
+
+export const ANOMALY_SOURCE_LABEL: Record<PaymentAnomalySource, string> = {
+  notify: '支付回调',
+  sync_pay: '主动查单',
+  sweep: '超时扫描',
+}
+
+/**
+ * 默认只看待处理的。已处理的会越积越多，默认全看等于没有默认——
+ * 而这个列表的意义正是「有没有需要人去处理的事」。
+ */
+export const ANOMALY_RESOLVED_OPTIONS = [
+  { value: 'open', label: '待处理' },
+  { value: 'done', label: '已处理' },
+  { value: 'all', label: '全部' },
+] as const
+
+/** 订单关闭原因。never_submitted 是超时扫描发现「微信侧根本没有这笔单」时记的 */
+export const CLOSE_REASON_LABEL: Record<string, string> = {
+  timeout: '超时未支付',
+  user_cancel: '用户取消',
+  never_submitted: '未成功提交到微信',
+}

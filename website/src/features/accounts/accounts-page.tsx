@@ -36,11 +36,11 @@ import type { Account } from './api'
 // 与 server/app/security.py 的 PASSWORD_MIN_LEN 一致
 const PASSWORD_MIN = 8
 
-// tone 的取值来自 @/features/antony/constants 的 StatusOption：
-// 只有 pending / active / done / muted 四种，正常的用 done，停用的用 muted
+// tone 取值见 @/components/status-badge 的 StatusTone：只有 pending / active /
+// done / muted 四种，正常的用 done，停用的用 muted
 const STATUS_META = {
-  active: { value: 'active', label: '正常', tone: 'done' },
-  disabled: { value: 'disabled', label: '已停用', tone: 'muted' },
+  active: { label: '正常', tone: 'done' },
+  disabled: { label: '已停用', tone: 'muted' },
 } as const
 
 export function AccountsPage() {

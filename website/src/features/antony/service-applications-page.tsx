@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,26 +22,16 @@ import {
 import { DetailField } from '@/components/detail-field'
 import { PaginationBar } from '@/components/pagination-bar'
 import { SelectFilter } from '@/components/select-filter'
-import { StatusBadge } from '@/components/status-badge'
 import { formatTime } from '@/lib/format'
 
-import { listServiceApplications } from './api'
-import {
-  SERVICES,
-  SERVICE_STATUSES,
-  fieldLabel,
-  fieldValue,
-  serviceLabel,
-  statusMeta,
-  uploadLabel,
-} from './constants'
+import { deleteServiceApplication, listServiceApplications } from './api'
+import { SERVICES, fieldLabel, fieldValue, serviceLabel, uploadLabel } from './constants'
 import type { ServiceApplication, ServiceApplicationQuery } from './types'
-import { usePagedList } from './use-paged-list'
+import { usePagedList } from '@/lib/use-paged-list'
 
 const BLANK: ServiceApplicationQuery = {
   keyword: '',
   serviceId: '',
-  status: '',
   createdFrom: '',
   createdTo: '',
 }
@@ -68,6 +59,22 @@ export function ServiceApplicationsPage() {
     },
     [list],
   )
+
+  // 删除不可撤销，先 confirm 挡一道。图片留在 COS 里不跟着删（见 server/app/admin.py），
+  // 但对运营来说这条申请就是没了，确认文案不提这件事
+  const remove = async (row: ServiceApplication) => {
+    if (!confirm(`删除 ${row.name}（${row.phone}）的${serviceLabel(row.serviceId)}申请？删了就找不回来了。`)) {
+      return
+    }
+    try {
+      await deleteServiceApplication(row.id)
+      toast.success('已删除')
+      setDetail(null)
+      list.reload()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    }
+  }
 
   // 没配 COS 时服务端签不出地址，url 为 null。这种情况要说出来，不能让运营以为客户没传图
   const missingImageUrl =
@@ -99,13 +106,6 @@ export function ServiceApplicationsPage() {
           value={list.filters.serviceId}
           options={SERVICES.map((s) => ({ value: s.value, label: s.label }))}
           onChange={(value) => pick('serviceId', value)}
-        />
-        <SelectFilter
-          className="w-32"
-          placeholder="跟进状态"
-          value={list.filters.status}
-          options={SERVICE_STATUSES.map((s) => ({ value: s.value, label: s.label }))}
-          onChange={(value) => pick('status', value)}
         />
         <div className="flex items-center gap-1 text-sm text-muted-foreground">
           <span>提交日期</span>
@@ -139,8 +139,8 @@ export function ServiceApplicationsPage() {
               <TableHead className="w-28">客户名称</TableHead>
               <TableHead className="w-32">联系方式</TableHead>
               <TableHead className="w-16 text-right">图片</TableHead>
-              <TableHead className="w-24">状态</TableHead>
               <TableHead>表单摘要</TableHead>
+              <TableHead className="w-20">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -162,13 +162,23 @@ export function ServiceApplicationsPage() {
                   <TableCell className="text-right tabular-nums">
                     {imageCount(row) || <span className="text-muted-foreground">—</span>}
                   </TableCell>
-                  <TableCell>
-                    <StatusBadge status={statusMeta(SERVICE_STATUSES, row.status)} />
-                  </TableCell>
                   <TableCell className="max-w-md truncate" title={summary(row)}>
                     {summary(row) || (
                       <span className="text-muted-foreground">（只填了联系方式）</span>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      // 整行点击会打开详情抽屉，删除按钮要把事件挡在这里
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void remove(row)
+                      }}
+                    >
+                      删除
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
@@ -198,9 +208,6 @@ export function ServiceApplicationsPage() {
               <DetailField label="服务类别">{serviceLabel(detail.serviceId)}</DetailField>
               <DetailField label="客户名称">{detail.name}</DetailField>
               <DetailField label="联系方式">{detail.phone}</DetailField>
-              <DetailField label="状态">
-                <StatusBadge status={statusMeta(SERVICE_STATUSES, detail.status)} />
-              </DetailField>
               <DetailField label="提交时间">{formatTime(detail.createdAt)}</DetailField>
               {/* 各服务的表单字段不同，按提交时的键逐条列出；没登记中文名的显示原始 id */}
               {Object.entries(detail.fields).map(([id, value]) => (
@@ -249,6 +256,14 @@ export function ServiceApplicationsPage() {
               {Object.keys(detail.images).length === 0 && (
                 <p className="mt-5 text-sm text-muted-foreground">客户没有上传图片</p>
               )}
+
+              <Button
+                variant="destructive"
+                className="mt-6 w-full"
+                onClick={() => void remove(detail)}
+              >
+                删除这条申请
+              </Button>
             </div>
           )}
         </SheetContent>

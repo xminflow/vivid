@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,19 +22,17 @@ import {
 import { DetailField } from '@/components/detail-field'
 import { PaginationBar } from '@/components/pagination-bar'
 import { SelectFilter } from '@/components/select-filter'
-import { StatusBadge } from '@/components/status-badge'
 import { formatTime } from '@/lib/format'
 
-import { listAppointments } from './api'
-import { APPOINTMENT_STATUSES, PURPOSES, VISITOR_TYPES, statusMeta } from './constants'
+import { deleteAppointment, listAppointments } from './api'
+import { PURPOSES, VISITOR_TYPES } from './constants'
 import type { Appointment, AppointmentQuery } from './types'
-import { usePagedList } from './use-paged-list'
+import { usePagedList } from '@/lib/use-paged-list'
 
 const BLANK: AppointmentQuery = {
   keyword: '',
   visitorType: '',
   purpose: '',
-  status: '',
   visitDateFrom: '',
   visitDateTo: '',
 }
@@ -52,6 +51,23 @@ export function AppointmentsPage() {
     },
     [list],
   )
+
+  // 删除不可撤销，先 confirm 挡一道，确认文案里带上是谁的哪一条，
+  // 避免点错行还照着确认框点「确定」
+  const remove = async (row: Appointment) => {
+    if (!confirm(`删除 ${row.name}（${row.phone}）${row.visitDate} 的预约？删了就找不回来了。`)) {
+      return
+    }
+    try {
+      await deleteAppointment(row.id)
+      toast.success('已删除')
+      // 抽屉里那条可能正是被删的，一并关掉
+      setDetail(null)
+      list.reload()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    }
+  }
 
   return (
     <div className="p-6">
@@ -83,13 +99,6 @@ export function AppointmentsPage() {
           value={list.filters.purpose}
           options={asOptions(PURPOSES)}
           onChange={(value) => pick('purpose', value)}
-        />
-        <SelectFilter
-          className="w-32"
-          placeholder="跟进状态"
-          value={list.filters.status}
-          options={APPOINTMENT_STATUSES.map((s) => ({ value: s.value, label: s.label }))}
-          onChange={(value) => pick('status', value)}
         />
         <div className="flex items-center gap-1 text-sm text-muted-foreground">
           <span>到访日期</span>
@@ -126,8 +135,8 @@ export function AppointmentsPage() {
               <TableHead className="w-16 text-right">人数</TableHead>
               <TableHead className="w-32">预约需求</TableHead>
               <TableHead className="w-20">来源</TableHead>
-              <TableHead className="w-24">状态</TableHead>
               <TableHead>备注</TableHead>
+              <TableHead className="w-20">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -135,7 +144,7 @@ export function AppointmentsPage() {
               <SkeletonRows />
             ) : list.items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
                   没有符合条件的预约
                 </TableCell>
               </TableRow>
@@ -157,11 +166,21 @@ export function AppointmentsPage() {
                     {/* 未登录也能提交，能对上用户的才算会员提交 */}
                     {row.userId ? '会员' : <span className="text-muted-foreground">游客</span>}
                   </TableCell>
-                  <TableCell>
-                    <StatusBadge status={statusMeta(APPOINTMENT_STATUSES, row.status)} />
-                  </TableCell>
                   <TableCell className="max-w-64 truncate" title={row.note}>
                     {row.note || <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      // 整行点击会打开详情抽屉，删除按钮要把事件挡在这里
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void remove(row)
+                      }}
+                    >
+                      删除
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
@@ -197,13 +216,18 @@ export function AppointmentsPage() {
               <DetailField label="提交人">
                 {detail.userId ? `会员 ${detail.userId}` : '未登录游客'}
               </DetailField>
-              <DetailField label="状态">
-                <StatusBadge status={statusMeta(APPOINTMENT_STATUSES, detail.status)} />
-              </DetailField>
               <DetailField label="提交时间">{formatTime(detail.createdAt)}</DetailField>
               <DetailField label="备注">
                 {detail.note || <span className="text-muted-foreground">（无）</span>}
               </DetailField>
+
+              <Button
+                variant="destructive"
+                className="mt-6 w-full"
+                onClick={() => void remove(detail)}
+              >
+                删除这条预约
+              </Button>
             </div>
           )}
         </SheetContent>
@@ -217,7 +241,7 @@ function SkeletonRows() {
     <>
       {Array.from({ length: 5 }, (_, i) => (
         <TableRow key={i}>
-          <TableCell colSpan={11}>
+          <TableCell colSpan={10}>
             <Skeleton className="h-5 w-full" />
           </TableCell>
         </TableRow>

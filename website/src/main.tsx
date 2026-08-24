@@ -9,7 +9,14 @@ import { RequireAuth } from '@/features/auth/require-auth'
 import { SessionProvider } from '@/features/auth/session-context'
 import { AppointmentsPage } from '@/features/antony/appointments-page'
 import { HomeMediaPage } from '@/features/antony/home-media-page'
+import { PaymentAnomaliesPage } from '@/features/antony/payment-anomalies-page'
 import { ServiceApplicationsPage } from '@/features/antony/service-applications-page'
+import { ShopCategoriesPage } from '@/features/antony/shop-categories-page'
+import { ShopOrdersPage } from '@/features/antony/shop-orders-page'
+import { ShopProductsPage } from '@/features/antony/shop-products-page'
+import { CasesPage } from '@/features/anjia/cases-page'
+import { CertificationsPage } from '@/features/anjia/certifications-page'
+import { AnjiaUsersPage } from '@/features/anjia/users-page'
 import { AccountsPage } from '@/features/accounts/accounts-page'
 
 import './index.css'
@@ -28,6 +35,13 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/antony/appointments" element={<AppointmentsPage />} />
               <Route path="/antony/service-applications" element={<ServiceApplicationsPage />} />
               <Route path="/antony/home-media" element={<HomeMediaPage />} />
+              <Route path="/antony/shop-products" element={<ShopProductsPage />} />
+              <Route path="/antony/shop-categories" element={<ShopCategoriesPage />} />
+              <Route path="/antony/shop-orders" element={<ShopOrdersPage />} />
+              <Route path="/antony/payment-anomalies" element={<PaymentAnomaliesPage />} />
+              <Route path="/anjia/certifications" element={<CertificationsPage />} />
+              <Route path="/anjia/cases" element={<CasesPage />} />
+              <Route path="/anjia/users" element={<AnjiaUsersPage />} />
               {/* 只有超管进得去，普通管理员访问会吃服务端的 403 并在页面上报错 */}
               <Route path="/accounts" element={<AccountsPage />} />
               {/* 打错地址不该白屏，回到默认页 */}
@@ -37,7 +51,7 @@ createRoot(document.getElementById('root')!).render(
         </Routes>
       </SessionProvider>
     </BrowserRouter>
-    {/* 接口报错统一走 toast，见 features/antony/use-paged-list.ts */}
+    {/* 接口报错统一走 toast，见 lib/use-paged-list.ts */}
     <Toaster position="top-center" richColors />
   </StrictMode>,
 )
