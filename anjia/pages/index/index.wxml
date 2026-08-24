@@ -1,0 +1,48 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="waterfall">
+    <view class="col" wx:for="{{skeletons}}" wx:for-item="col" wx:key="index">
+      <view class="cell" wx:for="{{col}}" wx:for-item="r" wx:key="index">
+        <skeleton ratio="{{r}}" />
+      </view>
+    </view>
+  </view>
+
+  <empty
+    wx:elif="{{error}}"
+    text="内容没能加载出来"
+    hint="{{error}}"
+    action="重试"
+    bind:action="onRetry"
+  />
+
+  <empty
+    wx:elif="{{!cols[0].length && !cols[1].length}}"
+    text="还没有案例"
+    hint="企业认证账号发布的设计案例、新品与样板间会出现在这里"
+  />
+
+  <block wx:else>
+    <view class="waterfall">
+      <view class="col" wx:for="{{cols}}" wx:for-item="col" wx:key="index">
+        <view class="cell" wx:for="{{col}}" wx:for-item="c" wx:key="id">
+          <waterfall-card data-id="{{c.id}}" bindtap="onCase">
+            <image class="cover" src="{{c.image}}" mode="aspectFill" style="height:{{c.imgH}}rpx" />
+            <view class="body">
+              <view class="title">{{c.title}}</view>
+              <view class="author">
+                <author-row avatar="{{c.author.avatar}}" name="{{c.author.name}}" meta="{{c.viewsText}}" />
+              </view>
+            </view>
+          </waterfall-card>
+        </view>
+      </view>
+    </view>
+
+    <view class="more">{{loadingMore ? '加载中…' : (noMore ? '没有更多了' : '')}}</view>
+  </block>
+
+  <!-- 个人账号也看得见。点了弹「去认证」——见 index.js 的 onPublish -->
+  <view class="publish" bindtap="onPublish" hover-class="is-hover" hover-stay-time="80">
+    <text class="plus">＋</text>
+  </view>
+</view>

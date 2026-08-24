@@ -1,0 +1,75 @@
+.page {
+  padding: 80rpx 48rpx;
+}
+
+.title {
+  font-size: 44rpx;
+  font-weight: 600;
+  margin-bottom: 40rpx;
+}
+
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 8rpx 32rpx;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid var(--hairline);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.entries {
+  margin-top: 24rpx;
+}
+
+/* 可点的行右侧带一个指向箭头，与上面那张纯展示卡区分开 */
+.entry .value::after {
+  content: '›';
+  margin-left: 12rpx;
+  color: var(--text-faint);
+}
+
+.label {
+  color: var(--text-weak);
+}
+
+.value {
+  font-size: 26rpx;
+}
+
+/* 入口行右侧是状态而不是资料，弱一档；已开通/已认证时才提到正文色 */
+.entry .value {
+  color: var(--text-faint);
+}
+
+.entry .value.on {
+  color: var(--text);
+}
+
+.hint,
+.error {
+  margin-top: 32rpx;
+  color: var(--text-weak);
+}
+
+.error {
+  color: #C0392B;
+}
+
+.retry {
+  display: inline-block;
+  margin-top: 24rpx;
+  padding: 12rpx 40rpx;
+  border: 1rpx solid var(--hairline);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 26rpx;
+}

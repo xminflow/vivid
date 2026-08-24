@@ -1,0 +1,88 @@
+.page {
+  /* 底部留出悬浮发布按钮的高度，最后一张卡不会被它压住 */
+  padding-bottom: 160rpx;
+}
+
+/* 「关注」tab 连同顶部整块去掉了：关注、粉丝数、账号主页是独立一刀，
+   留一个永远空着的 tab 比没有它更像 bug（见 index.js 开头）。
+   页内大标题原本也已按要求去掉，所以这一屏直接从瀑布流开始。 */
+
+.waterfall {
+  display: flex;
+  align-items: flex-start;
+  padding: 24rpx var(--gutter) 0;
+}
+
+.col {
+  flex: 1;
+  min-width: 0;
+}
+
+.col + .col {
+  margin-left: var(--col-gap);
+}
+
+.cell {
+  margin-bottom: var(--col-gap);
+}
+
+/* 高度由 JS 按原图比例算好写进 style，不用 widthFix——widthFix 要等图片解码完
+   才知道多高，那一瞬间的塌陷正是瀑布流最难看的地方 */
+.cover {
+  display: block;
+  width: 100%;
+  background: var(--placeholder);
+}
+
+.body {
+  padding: 16rpx;
+}
+
+.title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--fs-card);
+  font-weight: var(--fw-medium);
+  line-height: 1.5;
+}
+
+.author {
+  margin-top: 16rpx;
+}
+
+/* 翻页提示。弱到几乎不占视觉重量——它是状态，不是内容 */
+.more {
+  padding: 32rpx 0;
+  color: var(--ink-weak);
+  font-size: var(--fs-meta);
+  letter-spacing: var(--ls-meta);
+  text-align: center;
+}
+
+/* 发布入口。这一屏唯一的品牌色实心块，也就是 tokens.wxss 规则 1 允许的
+   「一屏最多一个主 CTA」。不做胶囊圆角——那是消费类 App 的语汇 */
+.publish {
+  position: fixed;
+  right: var(--gutter);
+  bottom: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: var(--r-img);
+  background: var(--brand);
+  color: var(--brand-ink);
+}
+
+.publish.is-hover {
+  opacity: 0.88;
+}
+
+.plus {
+  font-size: 44rpx;
+  line-height: 1;
+}

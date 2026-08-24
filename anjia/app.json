@@ -1,0 +1,55 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/meet/meet",
+    "pages/market/market",
+    "pages/mine/mine",
+    "pages/membership/membership",
+    "pages/certification/certification",
+    "pages/case/case",
+    "pages/publish/publish"
+  ],
+  "tabBar": {
+    "color": "#6E6A63",
+    "selectedColor": "#171614",
+    "backgroundColor": "#F5F3F0",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "assets/tabbar/home.png",
+        "selectedIconPath": "assets/tabbar/home-on.png"
+      },
+      {
+        "pagePath": "pages/meet/meet",
+        "text": "随安而遇",
+        "iconPath": "assets/tabbar/meet.png",
+        "selectedIconPath": "assets/tabbar/meet-on.png"
+      },
+      {
+        "pagePath": "pages/market/market",
+        "text": "安选有品",
+        "iconPath": "assets/tabbar/market.png",
+        "selectedIconPath": "assets/tabbar/market-on.png"
+      },
+      {
+        "pagePath": "pages/mine/mine",
+        "text": "我的",
+        "iconPath": "assets/tabbar/mine.png",
+        "selectedIconPath": "assets/tabbar/mine-on.png"
+      }
+    ]
+  },
+  "window": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "安家立业",
+    "navigationBarBackgroundColor": "#F5F3F0",
+    "backgroundColor": "#F5F3F0",
+    "backgroundTextStyle": "dark"
+  },
+  "style": "v2",
+  "componentFramework": "glass-easel",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

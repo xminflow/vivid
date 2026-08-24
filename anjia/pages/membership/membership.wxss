@@ -1,0 +1,99 @@
+.page {
+  padding: 80rpx 48rpx;
+}
+
+.hero {
+  margin-bottom: 48rpx;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4rpx 20rpx;
+  border: 1rpx solid var(--hairline);
+  border-radius: 999rpx;
+  color: var(--text-faint);
+  font-size: 22rpx;
+  line-height: 1.8;
+}
+
+.badge-on {
+  border-color: var(--text);
+  color: var(--text);
+}
+
+.headline {
+  margin-top: 24rpx;
+  font-size: 56rpx;
+  font-weight: 600;
+  letter-spacing: 4rpx;
+}
+
+.sub {
+  margin-top: 16rpx;
+  color: var(--text-weak);
+  font-size: 26rpx;
+}
+
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 8rpx 32rpx;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid var(--hairline);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.label {
+  color: var(--text-weak);
+}
+
+.value {
+  font-size: 26rpx;
+}
+
+.join {
+  display: block;
+  width: 100%;
+  padding: 28rpx 0;
+  border-radius: var(--radius);
+  background: var(--text);
+  color: var(--card);
+  font-size: 30rpx;
+  text-align: center;
+}
+
+.join[disabled] {
+  opacity: 0.5;
+}
+
+/* 需求文档 2.2 要求开通页明确提示未来会收费。位置紧跟按钮，不要挪到页尾 */
+.notice {
+  margin-top: 24rpx;
+  color: var(--text-weak);
+  font-size: 24rpx;
+  text-align: center;
+}
+
+.error {
+  margin-top: 32rpx;
+  color: #C0392B;
+}
+
+.retry {
+  display: inline-block;
+  margin-top: 24rpx;
+  padding: 12rpx 40rpx;
+  border: 1rpx solid var(--hairline);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 26rpx;
+}

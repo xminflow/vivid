@@ -1,0 +1,21 @@
+.list-row {
+  position: relative;
+  padding: 32rpx 24rpx;
+  background: var(--surface);
+}
+
+/* 分隔线内缩到与正文左对齐，并且用伪元素画——1rpx 的 border 在部分机型会被
+   舍成 0 而整条消失 */
+.list-row.is-divided::after {
+  content: '';
+  position: absolute;
+  left: 24rpx;
+  right: 0;
+  bottom: 0;
+  height: 1rpx;
+  background: var(--hairline);
+}
+
+.list-row.is-hover {
+  background: #F0EDE9;
+}

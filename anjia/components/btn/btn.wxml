@@ -1,0 +1,6 @@
+<view
+  class="btn btn--{{type}} btn--{{size}} {{block ? 'btn--block' : ''}} {{disabled ? 'is-disabled' : ''}}"
+  hover-class="{{disabled ? '' : 'is-hover'}}"
+  hover-stay-time="80"
+  bindtap="onTap"
+>{{text}}</view>

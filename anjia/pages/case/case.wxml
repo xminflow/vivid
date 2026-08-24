@@ -1,0 +1,54 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="loading">
+    <skeleton ratio="1.33" />
+  </view>
+
+  <empty
+    wx:elif="{{error}}"
+    text="这条案例打不开"
+    hint="{{error}}"
+    action="重试"
+    bind:action="onRetry"
+  />
+
+  <block wx:else>
+    <view class="gallery" style="height:{{swiperH}}rpx">
+      <swiper
+        class="swiper"
+        style="height:{{swiperH}}rpx"
+        circular="{{false}}"
+        bindchange="onSwiper"
+      >
+        <swiper-item wx:for="{{detail.images}}" wx:key="index">
+          <image
+            class="shot"
+            src="{{item.url}}"
+            mode="aspectFit"
+            data-index="{{index}}"
+            bindtap="onPreview"
+          />
+        </swiper-item>
+      </swiper>
+      <view wx:if="{{detail.images.length > 1}}" class="counter">
+        {{current + 1}} / {{detail.images.length}}
+      </view>
+    </view>
+
+    <view class="content">
+      <view class="title">{{detail.title}}</view>
+      <view wx:if="{{detail.body}}" class="body">{{detail.body}}</view>
+      <view class="meta">{{detail.viewsText}} · {{detail.dateText}}</view>
+
+      <view class="author">
+        <!-- 不传 certified：首页内容流本来就只有企业认证账号能发，一屏一枚人人都有的
+             角标不传递任何信息（同 anjia/mock/home.js 里那条理由）。
+             meta 也留空——浏览量与日期在上面那行，重复一遍只是噪点 -->
+        <author-row
+          avatar="{{detail.author.avatarUrl}}"
+          name="{{detail.author.name}}"
+          size="md"
+        />
+      </view>
+    </view>
+  </block>
+</view>

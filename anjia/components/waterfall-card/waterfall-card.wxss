@@ -1,0 +1,10 @@
+/* 不描边、不投影。卡片的边界完全靠 --surface 与 --bg 的明度差撑起来 */
+.card {
+  overflow: hidden;
+  border-radius: 12rpx;
+  background: var(--surface);
+}
+
+.card.is-hover {
+  opacity: 0.86;
+}

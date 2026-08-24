@@ -1,0 +1,3 @@
+<view class="amount amount--{{size}}">
+  <text class="sym">¥</text><text class="num">{{value}}</text>
+</view>

@@ -1,0 +1,3 @@
+<view class="card" hover-class="is-hover" hover-stay-time="80" bindtap="onTap">
+  <slot />
+</view>

@@ -1,0 +1,56 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8rpx;
+  font-family: inherit;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.btn--md {
+  height: 80rpx;
+  padding: 0 32rpx;
+  font-size: 28rpx;
+  font-weight: 500;
+}
+
+.btn--sm {
+  height: 56rpx;
+  padding: 0 24rpx;
+  font-size: 24rpx;
+  font-weight: 500;
+}
+
+.btn--block {
+  display: flex;
+  width: 100%;
+}
+
+.btn--primary {
+  color: var(--brand-ink);
+  background: var(--brand);
+}
+
+/* ghost 用 hairline 描边，不是品牌色描边——一屏里赭色只该出现在 primary 上 */
+.btn--ghost {
+  color: var(--ink);
+  background: transparent;
+  border: 1rpx solid var(--hairline-strong);
+}
+
+.btn--text {
+  height: auto;
+  padding: 0;
+  color: var(--ink-weak);
+  background: transparent;
+  font-weight: 400;
+}
+
+.btn.is-hover {
+  opacity: 0.7;
+}
+
+.btn.is-disabled {
+  opacity: 0.35;
+}

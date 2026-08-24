@@ -1,0 +1,10 @@
+{
+  "usingComponents": {
+    "waterfall-card": "/components/waterfall-card/waterfall-card",
+    "author-row": "/components/author-row/author-row",
+    "skeleton": "/components/skeleton/skeleton",
+    "empty": "/components/empty/empty"
+  },
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
+}

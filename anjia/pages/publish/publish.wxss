@@ -1,0 +1,128 @@
+.page {
+  padding: var(--sp-3) var(--gutter) 64rpx;
+}
+
+.section + .section {
+  margin-top: var(--sp-5);
+}
+
+.label {
+  display: flex;
+  align-items: baseline;
+  color: var(--ink);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-medium);
+}
+
+.count {
+  margin-left: var(--sp-1);
+  color: var(--ink-weak);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-normal);
+  letter-spacing: var(--ls-meta);
+}
+
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: var(--sp-2);
+}
+
+/* 三列。九张图正好三行，与微信相册一次最多选九张对齐 */
+.tile {
+  position: relative;
+  width: 214rpx;
+  height: 214rpx;
+  margin-right: var(--sp-2);
+  margin-bottom: var(--sp-2);
+  border-radius: var(--r-img);
+  background: var(--placeholder);
+}
+
+.tile:nth-child(3n) {
+  margin-right: 0;
+}
+
+.shot {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--r-img);
+}
+
+/* 删除键压在图角上。用 catchtap 而不是 bindtap，否则会连带触发预览 */
+.remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 0 var(--r-img) 0 var(--r-img);
+  background: rgba(23, 22, 20, 0.5);
+  color: var(--on-photo);
+  font-size: 28rpx;
+  line-height: 1;
+}
+
+.tile--add,
+.tile--busy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-weak);
+}
+
+.tile--add {
+  font-size: 48rpx;
+}
+
+.tile--busy {
+  font-size: var(--fs-meta);
+  letter-spacing: var(--ls-meta);
+}
+
+.hint {
+  margin-top: var(--sp-1);
+  color: var(--ink-weak);
+  font-size: var(--fs-meta);
+  letter-spacing: var(--ls-meta);
+  line-height: 1.6;
+}
+
+/* 输入框只用一条下边线，不描一圈框：整页描边会把表单变成一堆格子
+   （tokens.wxss 规则 3——边界靠明度差，不靠圈边） */
+.input {
+  margin-top: var(--sp-2);
+  padding: var(--sp-2) 0;
+  border-bottom: 1rpx solid var(--hairline);
+  color: var(--ink);
+  font-size: var(--fs-body);
+}
+
+.textarea {
+  width: 100%;
+  height: 240rpx;
+  margin-top: var(--sp-2);
+  padding: var(--sp-2);
+  box-sizing: border-box;
+  border-radius: var(--r-img);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--fs-body);
+  line-height: 1.7;
+}
+
+/* 「要等审核」是这一页最要紧的一句话，所以它紧贴按钮，而不是缩在页脚 */
+.notice {
+  margin-top: var(--sp-5);
+  color: var(--ink-weak);
+  font-size: var(--fs-meta);
+  letter-spacing: var(--ls-meta);
+  line-height: 1.6;
+}
+
+.submit {
+  margin-top: var(--sp-3);
+}

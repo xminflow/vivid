@@ -1,0 +1,8 @@
+<view class="author-row author-row--{{size}}">
+  <avatar src="{{avatar}}" size="{{size === 'md' ? 80 : 40}}" />
+  <view class="name">{{name}}</view>
+  <view wx:if="{{certified}}" class="badge">
+    <view class="tick"></view>
+  </view>
+  <view wx:if="{{meta}}" class="meta">{{meta}}</view>
+</view>

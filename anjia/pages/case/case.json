@@ -1,0 +1,8 @@
+{
+  "usingComponents": {
+    "author-row": "/components/author-row/author-row",
+    "skeleton": "/components/skeleton/skeleton",
+    "empty": "/components/empty/empty"
+  },
+  "navigationBarTitleText": "案例"
+}

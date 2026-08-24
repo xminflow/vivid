@@ -1,0 +1,69 @@
+.author-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.name {
+  margin-left: 12rpx;
+  color: var(--ink-weak);
+  font-size: 22rpx;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.author-row--md .name {
+  margin-left: 16rpx;
+  color: var(--ink);
+  font-size: 28rpx;
+  font-weight: 500;
+}
+
+/* 认证角标：极小的实心方块，不加文字、不加彩色徽章。
+   它要小到「扫过去只留下一个已认证的印象」，而不是抢走名字的注意力 */
+.badge {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22rpx;
+  height: 22rpx;
+  margin-left: 6rpx;
+  border-radius: 4rpx;
+  background: var(--brand);
+}
+
+.author-row--md .badge {
+  width: 28rpx;
+  height: 28rpx;
+  margin-left: 8rpx;
+}
+
+/* 对勾用两条白边旋转出来，不依赖图标字体，也不进一张图 */
+.tick {
+  width: 6rpx;
+  height: 10rpx;
+  margin-top: -3rpx;
+  border-right: 2rpx solid var(--brand-ink);
+  border-bottom: 2rpx solid var(--brand-ink);
+  transform: rotate(45deg);
+}
+
+.author-row--md .tick {
+  width: 8rpx;
+  height: 14rpx;
+  border-width: 3rpx;
+}
+
+.meta {
+  margin-left: auto;
+  padding-left: 12rpx;
+  flex: none;
+  color: var(--ink-weak);
+  font-size: 22rpx;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}

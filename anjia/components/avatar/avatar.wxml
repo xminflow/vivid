@@ -1,0 +1,9 @@
+<view class="avatar" style="width:{{size}}rpx;height:{{size}}rpx">
+  <image
+    wx:if="{{src && !failed}}"
+    class="img"
+    src="{{src}}"
+    mode="aspectFill"
+    binderror="onError"
+  />
+</view>

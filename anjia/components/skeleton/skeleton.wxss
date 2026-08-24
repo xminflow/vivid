@@ -1,0 +1,36 @@
+.sk {
+  overflow: hidden;
+  border-radius: 12rpx;
+  background: var(--surface);
+  animation: breathe 1.4s ease-in-out infinite;
+}
+
+/* padding-top 撑高度，是在图片真实尺寸未知时唯一能按比例占位的办法 */
+.sk-img {
+  width: 100%;
+  background: var(--placeholder);
+}
+
+.sk-body {
+  padding: 16rpx;
+}
+
+.sk-line {
+  height: 24rpx;
+  margin-bottom: 12rpx;
+  border-radius: 4rpx;
+  background: var(--placeholder);
+}
+
+.sk-meta {
+  width: 40%;
+  height: 20rpx;
+  margin-top: 16rpx;
+  border-radius: 4rpx;
+  background: var(--placeholder);
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}

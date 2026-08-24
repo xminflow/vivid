@@ -1,0 +1,53 @@
+<view class="page">
+  <view class="section">
+    <view class="label">图片<text class="count">{{images.length}}/{{maxImages}}</text></view>
+    <view class="grid">
+      <view class="tile" wx:for="{{images}}" wx:key="key">
+        <image class="shot" src="{{item.url}}" mode="aspectFill" data-index="{{index}}" bindtap="onPreviewImage" />
+        <view class="remove" data-index="{{index}}" catchtap="onRemoveImage">×</view>
+      </view>
+
+      <view wx:if="{{uploading > 0}}" class="tile tile--busy">上传中…</view>
+
+      <view
+        wx:if="{{images.length + uploading < maxImages}}"
+        class="tile tile--add"
+        bindtap="onChooseImage"
+      >＋</view>
+    </view>
+    <view class="hint">第一张作为首页封面。支持 JPG / PNG / WebP，单张不超过 5MB。</view>
+  </view>
+
+  <view class="section">
+    <view class="label">标题</view>
+    <input
+      class="input"
+      value="{{title}}"
+      maxlength="{{maxTitle}}"
+      placeholder="一句话说清这是什么"
+      bindinput="onTitle"
+    />
+  </view>
+
+  <view class="section">
+    <view class="label">正文<text class="count">选填</text></view>
+    <textarea
+      class="textarea"
+      value="{{body}}"
+      maxlength="{{maxBody}}"
+      placeholder="可以聊聊设计思路、用材、遇到的问题"
+      bindinput="onBody"
+    />
+  </view>
+
+  <view class="notice">提交后进入人工审核，通过后才会出现在首页内容流。</view>
+
+  <view class="submit">
+    <btn
+      text="{{submitting ? '提交中…' : '提交审核'}}"
+      block="{{true}}"
+      disabled="{{submitting}}"
+      bind:tap="onSubmit"
+    />
+  </view>
+</view>

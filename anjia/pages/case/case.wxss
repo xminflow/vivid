@@ -1,0 +1,70 @@
+.page {
+  padding-bottom: 64rpx;
+}
+
+.loading {
+  padding: var(--gutter);
+}
+
+/* 图区通栏，不留左右边距：这一页的主体就是图，收边等于把它变小
+   （tokens.wxss 规则 2——「大气」来自图片占比） */
+.gallery {
+  position: relative;
+  background: var(--placeholder);
+}
+
+.swiper {
+  width: 100%;
+}
+
+.shot {
+  width: 100%;
+  height: 100%;
+}
+
+/* 页码。不用 swiper 自带的指示点：九张图就是九个点，成了一条虚线 */
+.counter {
+  position: absolute;
+  right: var(--gutter);
+  bottom: var(--sp-2);
+  padding: 4rpx 12rpx;
+  border-radius: var(--r-tag);
+  background: rgba(23, 22, 20, 0.45);
+  color: var(--on-photo);
+  font-size: var(--fs-meta);
+  letter-spacing: var(--ls-meta);
+}
+
+.content {
+  padding: var(--sp-4) var(--gutter) 0;
+}
+
+.title {
+  color: var(--ink);
+  font-size: var(--fs-title);
+  font-weight: var(--fw-bold);
+  line-height: 1.4;
+}
+
+.body {
+  margin-top: var(--sp-3);
+  color: var(--ink);
+  font-size: var(--fs-body);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.meta {
+  margin-top: var(--sp-3);
+  color: var(--ink-weak);
+  font-size: var(--fs-meta);
+  letter-spacing: var(--ls-meta);
+}
+
+/* 作者压在正文之后而不是标题之前：这一页是先看内容、再看是谁发的。
+   这一行不可点——账号主页和私信都还没做，见 case.js 开头 */
+.author {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-4);
+  border-top: 1rpx solid var(--hairline);
+}

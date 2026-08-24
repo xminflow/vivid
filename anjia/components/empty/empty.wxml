@@ -1,0 +1,7 @@
+<view class="empty">
+  <view class="text">{{text}}</view>
+  <view wx:if="{{hint}}" class="hint">{{hint}}</view>
+  <view wx:if="{{action}}" class="action">
+    <btn text="{{action}}" type="ghost" size="sm" bind:tap="onAction" />
+  </view>
+</view>

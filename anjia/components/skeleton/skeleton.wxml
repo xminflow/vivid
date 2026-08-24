@@ -1,0 +1,12 @@
+<view class="sk">
+  <view class="sk-img" style="padding-top:{{ratio * 100}}%"></view>
+  <view class="sk-body">
+    <view
+      wx:for="{{lineList}}"
+      wx:key="*this"
+      class="sk-line"
+      style="width:{{index === lineList.length - 1 ? '60%' : '100%'}}"
+    ></view>
+    <view class="sk-meta"></view>
+  </view>
+</view>

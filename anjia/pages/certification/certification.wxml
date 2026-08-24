@@ -1,0 +1,97 @@
+<view class="page">
+  <view class="hero">
+    <view class="headline">企业认证</view>
+    <view class="sub">认证通过后可在首页发布内容，账号以公司名称对外展示。</view>
+  </view>
+
+  <!-- 已认证 -->
+  <view class="card" wx:if="{{isApproved}}">
+    <view class="row">
+      <text class="label">状态</text>
+      <text class="value">已认证</text>
+    </view>
+    <view class="row">
+      <text class="label">公司名称</text>
+      <text class="value">{{user.companyName}}</text>
+    </view>
+    <view class="row">
+      <text class="label">联系人</text>
+      <text class="value">{{cert.contactName}}</text>
+    </view>
+  </view>
+  <view class="notice" wx:if="{{isApproved}}">如需修改公司名称，请联系我们。</view>
+
+  <!-- 审核中 -->
+  <view class="card" wx:if="{{isPending}}">
+    <view class="row">
+      <text class="label">状态</text>
+      <text class="value">审核中</text>
+    </view>
+    <view class="row">
+      <text class="label">公司名称</text>
+      <text class="value">{{cert.companyName}}</text>
+    </view>
+    <view class="row">
+      <text class="label">提交于</text>
+      <text class="value">{{cert.submittedAt}}</text>
+    </view>
+  </view>
+  <view class="notice" wx:if="{{isPending}}">审核期间不能修改，结果会在这里显示。</view>
+
+  <!-- 已驳回：先说清为什么，再让人改 -->
+  <view class="rejected" wx:if="{{isRejected}}">
+    <view class="rejected-title">未通过审核</view>
+    <view class="rejected-reason">{{cert.rejectReason}}</view>
+    <view class="rejected-hint">修改后可以重新提交。</view>
+  </view>
+
+  <!-- 表单：没交过、被驳回、被撤销 -->
+  <view class="form" wx:if="{{canSubmit}}">
+    <view class="field">
+      <text class="field-label">公司名称</text>
+      <input
+        class="input"
+        data-field="companyName"
+        value="{{form.companyName}}"
+        placeholder="请填写完整的公司名称"
+        maxlength="60"
+        bindinput="onInput"
+      />
+    </view>
+    <view class="field">
+      <text class="field-label">联系人</text>
+      <input
+        class="input"
+        data-field="contactName"
+        value="{{form.contactName}}"
+        placeholder="请填写联系人姓名"
+        maxlength="20"
+        bindinput="onInput"
+      />
+    </view>
+    <view class="field">
+      <text class="field-label">联系电话</text>
+      <input
+        class="input"
+        data-field="contactPhone"
+        value="{{form.contactPhone}}"
+        placeholder="请填写手机号"
+        type="number"
+        maxlength="11"
+        bindinput="onInput"
+      />
+    </view>
+
+    <button class="submit" bindtap="onSubmit" disabled="{{submitting}}">
+      {{submitting ? '提交中…' : '提交认证'}}
+    </button>
+    <view class="notice">提交后进入人工审核，无需上传营业执照。</view>
+  </view>
+
+  <view class="error" wx:if="{{error}}">
+    <text>{{error}}</text>
+    <button class="retry" wx:if="{{!canSubmit}}" bindtap="onRetry" disabled="{{loading}}">
+      重试
+    </button>
+  </view>
+</view>

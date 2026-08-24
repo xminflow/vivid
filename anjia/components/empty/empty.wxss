@@ -1,0 +1,21 @@
+.empty {
+  padding: 160rpx 48rpx 200rpx;
+  text-align: center;
+}
+
+.text {
+  color: var(--ink);
+  font-size: 28rpx;
+  font-weight: 500;
+}
+
+.hint {
+  margin-top: 12rpx;
+  color: var(--ink-weak);
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.action {
+  margin-top: 32rpx;
+}
