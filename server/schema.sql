@@ -125,11 +125,12 @@ CREATE TABLE IF NOT EXISTS appointments (
   -- 谁提交的。未登录也能填表，所以可为空
   user_id       bigint      REFERENCES users (id),
 
-  -- 运营用
-  status        text        NOT NULL DEFAULT 'new'
-                            CHECK (status IN ('new', 'confirmed', 'visited', 'cancelled')),
   created_at    timestamptz NOT NULL DEFAULT now()
 );
+
+-- 这张表曾有一个 status（跟进状态）列。它只有默认值没有写入口，后台改用
+-- 「删除记录」清理线索，已随 migrations/007_drop_status.sql 删除。
+-- 已经建好的库不会因为这里少了一行就把列删掉，要跑那个迁移脚本。
 
 -- 上面的 CREATE TABLE 对已经建好的库不生效，user_id 得单独补
 ALTER TABLE appointments ADD COLUMN IF NOT EXISTS user_id bigint REFERENCES users (id);
@@ -150,7 +151,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS appointments_phone_date_uniq
 -- 服务申请。五个服务共用一张表：
 -- 各服务的表单字段差异很大（设计类问面积预算，商品类问品牌成色），
 -- 拆五张表会让后台查列表要 union 五次，而这些字段运营只读不查，
--- 所以除了公共的联系方式和状态，其余字段整体存 jsonb。
+-- 所以除了公共的联系方式，其余字段整体存 jsonb。
 CREATE TABLE IF NOT EXISTS service_applications (
   id            bigserial PRIMARY KEY,
 
@@ -168,10 +169,10 @@ CREATE TABLE IF NOT EXISTS service_applications (
   -- 只存键不存 URL：桶和地域会变，URL 由服务端按需签发
   images        jsonb       NOT NULL DEFAULT '{}'::jsonb,
 
-  status        text        NOT NULL DEFAULT 'new'
-                            CHECK (status IN ('new', 'contacted', 'closed')),
   created_at    timestamptz NOT NULL DEFAULT now()
 );
+
+-- 同 appointments：原来的 status 列已随 migrations/007_drop_status.sql 删除
 
 CREATE INDEX IF NOT EXISTS service_applications_created_at_idx
   ON service_applications (created_at DESC);
@@ -275,3 +276,360 @@ CREATE TABLE IF NOT EXISTS admin_login_attempts (
   fail_count   integer     NOT NULL DEFAULT 0,
   locked_until timestamptz
 );
+
+-- ============================================================
+-- 安玺·集 商品目录
+-- ============================================================
+-- antony-casa 小程序「安玺·集」购物板块的商品与分类。
+-- 交易链路（购物车、地址、订单、订单行）属于阶段二，届时另行加表。
+-- 设计见 docs/superpowers/specs/2026-08-10-anxi-ji-design.md。
+
+-- 商品分类。单层，商品必属其一。
+--
+-- 只能停用、不能删除：停用会把该分类下所有在售商品一并改写为下架，
+-- 且重新启用**不会**自动恢复（需要后台点「批量上架」）。
+-- 这样做是为了让 shop_products.status 保持「商品能否被购买」的唯一判据——
+-- 若分类状态能隐式改变可购性，后台会显示「在售」而用户买不到。
+CREATE TABLE IF NOT EXISTS shop_categories (
+  id          bigint      PRIMARY KEY,
+  name        text        NOT NULL UNIQUE
+                          CONSTRAINT shop_categories_name_len CHECK (length(name) BETWEEN 1 AND 20),
+  sort_order  integer     NOT NULL DEFAULT 0,
+  status      text        NOT NULL DEFAULT 'active'
+                          CHECK (status IN ('active', 'disabled')),
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS shop_categories_listing_idx
+  ON shop_categories (status, sort_order DESC, id);
+
+DROP TRIGGER IF EXISTS shop_categories_touch_updated_at ON shop_categories;
+CREATE TRIGGER shop_categories_touch_updated_at
+  BEFORE UPDATE ON shop_categories
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+-- 商品。无 SKU、无库存：一个商品一个价格，status 是能否被购买的唯一判据。
+--
+-- category_id 不写 ON DELETE：默认的 NO ACTION 正好让「分类下还有商品就删不掉」
+-- 由数据库兜底。接口层本来就不提供删除分类的入口，这是第二道防线。
+--
+-- 三个 jsonb 列都是**有序数组**，顺序即展示顺序：
+--   images        COS key 数组，[0] 兼作列表页封面
+--   detail_images COS key 数组，详情正文按序渲染
+--   params        [{"name": "材质", "value": "实木"}]，展示型参数，不影响价格与可购性
+-- 数量上限写进 CHECK，避免应用层漏校验就把几百张图塞进来。
+-- 单条 key 的前缀与长度校验放在 models.py（check_static_key），SQL 里不重复。
+CREATE TABLE IF NOT EXISTS shop_products (
+  id             bigint      PRIMARY KEY,
+  category_id    bigint      NOT NULL REFERENCES shop_categories (id),
+  title          text        NOT NULL
+                             CONSTRAINT shop_products_title_len CHECK (length(title) BETWEEN 1 AND 60),
+  summary        text        NOT NULL DEFAULT ''
+                             CONSTRAINT shop_products_summary_len CHECK (length(summary) <= 500),
+  price_cents    integer     NOT NULL
+                             CONSTRAINT shop_products_price_positive CHECK (price_cents > 0),
+  images         jsonb       NOT NULL DEFAULT '[]'::jsonb
+                             CONSTRAINT shop_products_images_shape
+                             CHECK (jsonb_typeof(images) = 'array' AND jsonb_array_length(images) <= 10),
+  detail_images  jsonb       NOT NULL DEFAULT '[]'::jsonb
+                             CONSTRAINT shop_products_detail_images_shape
+                             CHECK (jsonb_typeof(detail_images) = 'array' AND jsonb_array_length(detail_images) <= 20),
+  params         jsonb       NOT NULL DEFAULT '[]'::jsonb
+                             CONSTRAINT shop_products_params_shape
+                             CHECK (jsonb_typeof(params) = 'array' AND jsonb_array_length(params) <= 20),
+  status         text        NOT NULL DEFAULT 'off'
+                             CHECK (status IN ('active', 'off')),
+  sort_order     integer     NOT NULL DEFAULT 0,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  updated_at     timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS shop_products_listing_idx
+  ON shop_products (status, sort_order DESC, created_at DESC, id);
+
+CREATE INDEX IF NOT EXISTS shop_products_category_idx
+  ON shop_products (category_id);
+
+DROP TRIGGER IF EXISTS shop_products_touch_updated_at ON shop_products;
+CREATE TRIGGER shop_products_touch_updated_at
+  BEFORE UPDATE ON shop_products
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+-- 购物车行。只存「谁、要哪件、要几个」，**不存价格**。
+--
+-- 不存价格快照是刻意的：购物车每次打开都实时回查商品的当前价格与在售状态，
+-- 价格以结算那一刻为准。存快照会带来「加购时是 9999、现在是 12999，按哪个结算」
+-- 这种没有好答案的问题。需要固化价格的是**订单**，那里必须存快照，两件事职责分开。
+--
+-- 两个外键都 CASCADE：删用户连购物车一起清；商品被硬删时购物车里那一行跟着消失。
+-- 这和订单行将来的 ON DELETE RESTRICT 正好相反——订单是凭证不能动，购物车只是暂存。
+CREATE TABLE IF NOT EXISTS shop_cart_items (
+  id          bigint      PRIMARY KEY,
+  user_id     bigint      NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  product_id  bigint      NOT NULL REFERENCES shop_products (id) ON DELETE CASCADE,
+  quantity    integer     NOT NULL DEFAULT 1
+                          CONSTRAINT shop_cart_items_quantity_range
+                          CHECK (quantity BETWEEN 1 AND 99),
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  -- 同一件商品在一个人的车里只有一行，重复加购是累加数量。靠唯一约束而不是
+  -- 「先查再插」：两次加购几乎同时到达时，查完到插入之间会各自认为「还没有」
+  CONSTRAINT shop_cart_items_one_row_per_product UNIQUE (user_id, product_id)
+);
+
+CREATE INDEX IF NOT EXISTS shop_cart_items_user_idx
+  ON shop_cart_items (user_id, created_at DESC, id DESC);
+
+CREATE INDEX IF NOT EXISTS shop_cart_items_product_idx
+  ON shop_cart_items (product_id);
+
+DROP TRIGGER IF EXISTS shop_cart_items_touch_updated_at ON shop_cart_items;
+CREATE TRIGGER shop_cart_items_touch_updated_at
+  BEFORE UPDATE ON shop_cart_items
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+-- 收货地址簿。是「用户当前的地址」，不是「订单用过的地址」——
+-- 订单存的是下单那一刻的快照（见 shop_orders 的六个地址列），
+-- 所以这张表可以随用户任意改删，历史订单不受影响。
+CREATE TABLE IF NOT EXISTS shop_addresses (
+  id          bigint      PRIMARY KEY,
+  user_id     bigint      NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  receiver    text        NOT NULL
+                          CONSTRAINT shop_addresses_receiver_len CHECK (length(receiver) BETWEEN 1 AND 20),
+  -- 与 users.phone / appointments.phone 同一条正则
+  phone       text        NOT NULL CHECK (phone ~ '^1[3-9][0-9]{9}$'),
+  province    text        NOT NULL
+                          CONSTRAINT shop_addresses_province_len CHECK (length(province) BETWEEN 1 AND 100),
+  city        text        NOT NULL
+                          CONSTRAINT shop_addresses_city_len CHECK (length(city) BETWEEN 1 AND 100),
+  district    text        NOT NULL
+                          CONSTRAINT shop_addresses_district_len CHECK (length(district) BETWEEN 1 AND 100),
+  detail      text        NOT NULL
+                          CONSTRAINT shop_addresses_detail_len CHECK (length(detail) BETWEEN 1 AND 100),
+  is_default  boolean     NOT NULL DEFAULT false,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS shop_addresses_user_idx
+  ON shop_addresses (user_id, created_at DESC, id DESC);
+
+-- 每人至多一个默认地址。部分唯一索引而不是应用层「先清旧的再设新的」：
+-- 那两步之间并发进来第二个请求就会留下两个默认地址，界面上只显示一个，
+-- 表现为「设了没生效」
+CREATE UNIQUE INDEX IF NOT EXISTS shop_addresses_one_default_per_user
+  ON shop_addresses (user_id) WHERE is_default;
+
+DROP TRIGGER IF EXISTS shop_addresses_touch_updated_at ON shop_addresses;
+CREATE TRIGGER shop_addresses_touch_updated_at
+  BEFORE UPDATE ON shop_addresses
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+-- 单号序号。单号格式 AX + YYYYMMDD + 6 位序号，如 AX20260810000137。
+-- 取号是单条原子语句（INSERT ... ON CONFLICT DO UPDATE ... RETURNING），
+-- 冲突分支的 UPDATE 持行锁到事务结束，并发下自然串行，不需要应用层加锁。
+--
+-- 不用 sequence：它不回滚（下单失败会咬掉号，单号出现空洞），也不好按天归零。
+-- 该单号同时作为微信支付的 out_trade_no（微信要求 6–32 位、商户内唯一，16 位正好）。
+CREATE TABLE IF NOT EXISTS shop_order_seq (
+  day   date    PRIMARY KEY,
+  next  integer NOT NULL
+                CONSTRAINT shop_order_seq_next_range CHECK (next BETWEEN 1 AND 999999)
+);
+
+-- 订单。
+--
+-- 状态机（旁支不可逆）：
+--   pending_pay ──支付成功──> pending_ship ──发货──> pending_receive ──收货──> completed
+--        │                                                              ↑
+--        ├──超时/用户取消──> closed                          （10 天自动确认）
+--        └──（已支付后由超管退款）──────> refunded
+--
+-- 六个地址列是**快照**，不存 address_id 引用：用户改了地址簿或删了那条地址，
+-- 都不能改变已经下过的单。与订单行存 title/price 快照同理。
+--
+-- 只存 total_cents 一个总额，不留运费/优惠分项——本期没有这些概念，
+-- 提前留列只会让人以为它们有意义。
+CREATE TABLE IF NOT EXISTS shop_orders (
+  id                bigint      PRIMARY KEY,
+  -- 前两位是**环境前缀**（ORDER_NO_PREFIX，生产 AX、开发 AD），后面是日期 + 当日序号。
+  -- 为什么要按环境分：微信支付没有沙箱，两个环境共用同一个商户号，而序号取自
+  -- 各自库里的 shop_order_seq，不分前缀就必然发出同名的 out_trade_no，
+  -- 于是超时关单会去关对方的单、每日对账会把对方的退款同步到自己身上。
+  -- 见 app/order_no.py 与 migrations/012_payment_hardening.sql
+  order_no          text        NOT NULL UNIQUE
+                                CONSTRAINT shop_orders_no_format
+                                CHECK (order_no ~ '^[A-Z]{2}[0-9]{14}$'),
+  user_id           bigint      NOT NULL REFERENCES users (id),
+  status            text        NOT NULL DEFAULT 'pending_pay'
+                                CHECK (status IN ('pending_pay', 'pending_ship', 'pending_receive',
+                                                  'completed', 'closed', 'refunded')),
+  -- 从购物车结算还是详情页「立即购买」。唯一用途是**支付成功时决定要不要清车**：
+  -- 不存的话到回调那一刻就无从判断，只能「在车里就顺手清掉」，
+  -- 那会让详情页直接购买莫名其妙地清掉用户车里的同款
+  source            text        NOT NULL DEFAULT 'cart'
+                                CHECK (source IN ('cart', 'direct')),
+  total_cents       integer     NOT NULL
+                                CONSTRAINT shop_orders_total_positive CHECK (total_cents > 0),
+
+  receiver          text        NOT NULL,
+  phone             text        NOT NULL,
+  province          text        NOT NULL,
+  city              text        NOT NULL,
+  district          text        NOT NULL,
+  detail            text        NOT NULL,
+
+  transaction_id    text,
+  paid_at           timestamptz,
+  -- 主动查单与超时扫描共用的节流字段：上次向微信查这笔单的时刻
+  last_query_at     timestamptz,
+  -- 上次向微信**下单**的时刻。与 last_query_at 是两个接口、两套频率限制，
+  -- 共用一个字段的话，用户下拉刷新（查单）会把「去支付」（下单）的节流也顶掉
+  last_pay_at       timestamptz,
+  -- 超时关单扫描连续处理失败的次数。达到上限后不再选中——
+  -- 没有这个计数的话，永远处理不掉的单会一直占着 `ORDER BY created_at LIMIT 50`
+  -- 的队头，攒够一屏就让整个扫描停摆。见 app/shop_pay.py 的 SWEEP_MAX_ATTEMPTS
+  sweep_attempts    integer     NOT NULL DEFAULT 0,
+
+  shipping_type     text        CHECK (shipping_type IN ('express', 'local', 'none')),
+  shipping_company  text,
+  tracking_no       text,
+  shipped_at        timestamptz,
+  -- 物流信息**回传给微信**的时刻。与 shipped_at 是两件事：那是运营在我们后台
+  -- 点发货的时刻，这是我们成功告诉微信的时刻。回传是一次会失败的网络调用，
+  -- 分开记才能表达「已发货但没传成功」这个必须被重试的状态。
+  -- 微信对实物交易有时限要求，超时不传会判发货延迟并影响交易权限
+  shipping_uploaded_at timestamptz,
+
+  received_at       timestamptz,
+
+  closed_at         timestamptz,
+  -- never_submitted：微信侧根本没有这笔单（下单那一刻就没提交成功）。
+  -- 与 timeout 分开——「用户没在时限内付」和「压根没送到微信」的排查方向完全不同
+  close_reason      text        CONSTRAINT shop_orders_close_reason_check
+                                CHECK (close_reason IN ('timeout', 'user_cancel',
+                                                        'never_submitted')),
+
+  refunded_at       timestamptz,
+  refund_reason     text,
+  refund_id         text,
+
+  remark            text        NOT NULL DEFAULT '',
+
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  updated_at        timestamptz NOT NULL DEFAULT now(),
+
+  -- 走快递就必须有运单号，另两档必须没有。没有这条约束的话，
+  -- 「选了快递但运单号为空」会一路流到微信的发货信息录入接口才报错
+  CONSTRAINT shop_orders_express_needs_tracking CHECK (
+    shipping_type IS DISTINCT FROM 'express' OR (tracking_no IS NOT NULL AND tracking_no <> '')
+  )
+);
+
+CREATE INDEX IF NOT EXISTS shop_orders_user_idx
+  ON shop_orders (user_id, created_at DESC, id DESC);
+
+CREATE INDEX IF NOT EXISTS shop_orders_status_idx
+  ON shop_orders (status, created_at DESC, id DESC);
+
+-- 「已发货但还没把物流信息传给微信」的单，给重试和人工排查用。
+-- 部分索引：绝大多数订单要么没发货、要么已经传成功，落进来的只有出问题的那几笔
+CREATE INDEX IF NOT EXISTS shop_orders_pending_upload_idx
+  ON shop_orders (shipped_at)
+  WHERE shipped_at IS NOT NULL AND shipping_uploaded_at IS NULL;
+
+-- 回调幂等在数据库层的第二道防线：应用层已经用 SELECT ... FOR UPDATE 锁行判重，
+-- 但回调会被微信重投、也可能与主动查单同时到达，多进程下只有唯一索引挡得住
+CREATE UNIQUE INDEX IF NOT EXISTS shop_orders_transaction_uniq
+  ON shop_orders (transaction_id) WHERE transaction_id IS NOT NULL;
+
+DROP TRIGGER IF EXISTS shop_orders_touch_updated_at ON shop_orders;
+CREATE TRIGGER shop_orders_touch_updated_at
+  BEFORE UPDATE ON shop_orders
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+-- 订单行。标题、单价、封面全是**下单那一刻的快照**，
+-- 任何场景（列表、详情、退款、对账）都不回查 shop_products 的当前值。
+--
+-- 两个外键方向相反：
+--   order_id    CASCADE  —— 订单没了行也没有意义（但订单本身不提供删除）
+--   product_id  RESTRICT —— **卖过的商品永远删不掉，只能下架**。由数据库强制，
+--                           后台的删除接口把外键违约翻译成 409 并列出引用它的订单号
+CREATE TABLE IF NOT EXISTS shop_order_items (
+  id                    bigint      PRIMARY KEY,
+  order_id              bigint      NOT NULL REFERENCES shop_orders (id) ON DELETE CASCADE,
+  product_id            bigint      NOT NULL REFERENCES shop_products (id) ON DELETE RESTRICT,
+  title_snapshot        text        NOT NULL,
+  price_cents_snapshot  integer     NOT NULL
+                                    CONSTRAINT shop_order_items_price_positive
+                                    CHECK (price_cents_snapshot > 0),
+  image_snapshot        text        NOT NULL DEFAULT '',
+  quantity              integer     NOT NULL
+                                    CONSTRAINT shop_order_items_quantity_range
+                                    CHECK (quantity BETWEEN 1 AND 99),
+  created_at            timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS shop_order_items_order_idx
+  ON shop_order_items (order_id, id);
+
+CREATE INDEX IF NOT EXISTS shop_order_items_product_idx
+  ON shop_order_items (product_id);
+
+-- 板块设置。单行表，id 恒为 1。加列比加行更容易看出有哪些设置，
+-- 也免去每次读都要判空
+CREATE TABLE IF NOT EXISTS shop_settings (
+  id              smallint    PRIMARY KEY CHECK (id = 1),
+  -- 客服二维码的 COS key。空串表示还没配，小程序据此隐藏「联系客服」入口
+  service_qr_key  text        NOT NULL DEFAULT '',
+  updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+INSERT INTO shop_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+DROP TRIGGER IF EXISTS shop_settings_touch_updated_at ON shop_settings;
+CREATE TRIGGER shop_settings_touch_updated_at
+  BEFORE UPDATE ON shop_settings
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+-- 支付异常台账。
+--
+-- 收到「支付成功」却对不上订单时写这里：金额与订单不符、单号在库里不存在、
+-- 微信没给支付单号。这三种都意味着**钱已经收了但订单没有正常流转**。
+--
+-- 为什么必须落库而不是只记日志：这几条路径最终都要向微信返回 SUCCESS
+-- （让它别再重投——重投一百次结果也一样），于是唯一的线索就只剩一行 error 日志，
+-- 而没有人会主动去翻日志。落库之后它是后台里一个能看见、能标记已处理的列表。
+--
+-- 不做外键指向 shop_orders：order_not_found 这一类恰恰是**没有**对应订单的，
+-- 有外键就写不进来，而那正是最需要被记下的一种。
+CREATE TABLE IF NOT EXISTS payment_anomalies (
+  id              bigint      PRIMARY KEY,
+  kind            text        NOT NULL
+                              CHECK (kind IN ('amount_mismatch', 'order_not_found',
+                                              'missing_transaction_id')),
+  -- 哪条通道发现的。三个入口都会写，排查时要先知道是回调、主动查单还是扫描发现的
+  source          text        NOT NULL CHECK (source IN ('notify', 'sync_pay', 'sweep')),
+
+  order_no        text        NOT NULL,
+  order_id        bigint,
+  transaction_id  text        NOT NULL DEFAULT '',
+  paid_cents      integer,
+  -- order_not_found 时为空：我们根本没有那笔订单，也就无从谈「应付多少」
+  expected_cents  integer,
+
+  -- 处理记录。行不删——这是资金异常的台账，处理完也要留着备查
+  resolved_at     timestamptz,
+  resolved_by     text        NOT NULL DEFAULT '',
+  resolve_note    text        NOT NULL DEFAULT '',
+
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+-- 后台默认只看未处理的。部分索引：处理完的行不该拖慢这个查询
+CREATE INDEX IF NOT EXISTS payment_anomalies_open_idx
+  ON payment_anomalies (created_at DESC, id DESC) WHERE resolved_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS payment_anomalies_order_no_idx
+  ON payment_anomalies (order_no);

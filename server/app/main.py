@@ -1,7 +1,9 @@
 """小程序接口：展厅预约登记、服务申请、COS 图片直传地址签发。"""
 
 import logging
-from contextlib import asynccontextmanager
+import asyncio
+import os
+from contextlib import asynccontextmanager, suppress
 
 import psycopg
 from fastapi import Depends, FastAPI, HTTPException, Request, status
@@ -11,14 +13,26 @@ from fastapi.responses import JSONResponse
 
 from psycopg.types.json import Json
 
-from . import cos, snowflake
+from . import cos, snowflake, wxpay
 from .admin import router as admin_router
 from .admin_accounts import router as admin_accounts_router
 from .admin_auth import router as admin_auth_router
+from .anjia import db as anjia_db
+from .anjia.admin import router as anjia_admin_router
+from .anjia.cases import router as anjia_cases_router
+from .anjia.cases_admin import router as anjia_cases_admin_router
+from .anjia.users import router as anjia_users_router
 from .db import pool
 from .home import router as home_router
 from .logging_setup import setup_logging
 from .models import AppointmentIn, ServiceApplicationIn, UploadUrlIn
+from .payment_anomalies import router as payment_anomalies_router
+from .shop import router as shop_router
+from .shop_addresses import router as shop_addresses_router
+from .shop_admin import router as shop_admin_router
+from .shop_orders import router as shop_orders_router
+from .shop_orders_admin import router as shop_orders_admin_router
+from .shop_pay import router as shop_pay_router
 from .users import current_user_or_none
 from .users import router as users_router
 
@@ -57,35 +71,148 @@ FIELD_MESSAGES = {
     "oldPassword": "请输入当前密码",
     "newPassword": "新密码要 8 到 64 位",
     "displayName": "姓名过长",
+    # 安家立业的企业认证申请
+    "companyName": "请填写完整的公司名称",
+    "contactName": "请填写联系人姓名",
+    "contactPhone": "联系电话格式不正确",
 }
+
+
+async def _sweep_loop() -> None:
+    """每 60 秒扫一轮：关掉超时未付的单，把发货满 10 天的置为已完成。
+
+    在 lifespan 里起一个 asyncio 任务，不引入 Celery 或 APScheduler：
+    这两件事各只有一个动作、没有重试语义、失败了下一轮自然重来，
+    为它们加一个任务队列和一个 broker 不划算。
+
+    异常一律吞掉并记日志——扫描任务崩了不能把整个服务带下去，
+    但必须留下痕迹，否则超时单会悄悄堆积而没人知道。
+
+    两件事分别 try：它们互不依赖，一件失败不该让另一件也停。
+    自动确认收货不碰微信，不该被「微信不通」连累。
+
+    退款对账是**每天一次**，不跟着这个节奏跑：它下载的是微信的日账单，
+    一天之内重复下载没有任何新信息。计时用进程内的时间戳，不落库——
+    重启后会多跑一次，而对账本身是幂等的，多跑一次只是多几 KB 下载。
+    """
+    from .shop_pay import sweep_auto_receipt, sweep_expired_orders
+    from .shop_reconcile import reconcile_refunds
+
+    last_reconcile = 0.0
+
+    while True:
+        await asyncio.sleep(60)
+        for name, job in (
+            ("超时关单", sweep_expired_orders),
+            ("自动确认收货", sweep_auto_receipt),
+        ):
+            try:
+                await job()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("%s出错，下一轮继续", name)
+
+        now = asyncio.get_running_loop().time()
+        if now - last_reconcile >= 24 * 60 * 60:
+            last_reconcile = now
+            try:
+                await reconcile_refunds()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("退款对账出错，明天再跑")
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     await pool.open(wait=True, timeout=10)
+
+    # 安家立业是另一个库、另一个池（docs/adr/0001）。没配就不开池、不注册路由，
+    # 安东尼之家照常服务——理由见 app/anjia/db.py，是部署顺序而不是怕报错
+    if anjia_db.configured():
+        await anjia_db.get_pool().open(wait=True, timeout=10)
+        logger.info("安家立业已接入，接口在 /api/anjia/ 下")
+    else:
+        logger.warning("未配置 DATABASE_URL_ANJIA，安家立业的接口不注册")
     # 机器号在启动时就定下来并打进日志，不等第一个用户注册才初始化——
     # 多实例撞号必须在启动阶段就能对着日志看出来
     logger.info("服务启动完成，雪花 ID 机器号 %d", snowflake.worker_id())
+
+    # 扫描任务**总是**起：它做两件事，只有「超时关单」依赖支付配置
+    # （那一半会自己返回 0），「发货满 10 天自动确认收货」纯粹是本地状态迁移。
+    # 支付没配时把缺了哪几项写进日志——这是判断「这台机器有没有接支付」最快的地方
+    sweeper = asyncio.create_task(_sweep_loop())
+    if wxpay.configured():
+        logger.info("订单扫描已启动，间隔 60 秒，支付超时 %d 分钟", wxpay.PAY_TIMEOUT_MINUTES)
+    else:
+        logger.warning(
+            "订单扫描已启动，但支付未配置、超时关单不会生效。缺：%s",
+            "、".join(wxpay.missing_config()),
+        )
+
     yield
+
+    if sweeper is not None:
+        sweeper.cancel()
+        with suppress(asyncio.CancelledError):
+            await sweeper
     await pool.close()
+    if anjia_db.configured():
+        await anjia_db.get_pool().close()
 
 
 app = FastAPI(title="展厅预约登记", lifespan=lifespan)
 
-# 开发者工具与本地后台会跨域访问；上线前收窄到具体域名
+# 跨域。**线上其实用不到**：Caddy 把 /api/* 和前端产物放在同一个域名下
+# （见 deploy/Caddyfile），后台和官网请求接口都是同源的；小程序的 wx.request
+# 不走浏览器的同源策略，压根不发 Origin。真正需要跨域的只有本地开发——
+# vite 跑在 5180 / 5190，接口在 3000。
+#
+# 所以默认值就是那几个本地地址，而不是 "*"。用 "*" 的代价不是「立刻能被利用」
+# （鉴权是 Bearer token 不是 Cookie，构不成 CSRF），而是任何一个网页都能拿着
+# 用户的 token 直接读我们的接口——一旦将来某处改用 Cookie 或加了别的凭据，
+# 这个通配符就从「暂时无害」变成一个洞，而那时没有人会想起来回头收窄它。
+#
+# 要放开别的来源在 .env 里配 CORS_ORIGINS（逗号分隔的完整来源，含协议和端口）
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5180,http://127.0.0.1:5180,"
+        "http://localhost:5190,http://127.0.0.1:5190",
+    ).split(",")
+    if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
+logger.info("跨域放行来源：%s", "、".join(CORS_ORIGINS) or "（无）")
 
 # 登录接口自己不能要求登录，所以它是独立的 router，不带 admin_router 上那个鉴权依赖
 app.include_router(admin_auth_router)
 app.include_router(users_router)
 app.include_router(home_router)
+app.include_router(shop_router)
+app.include_router(shop_addresses_router)
+app.include_router(shop_orders_router)
+app.include_router(shop_pay_router)
 app.include_router(admin_router)
 app.include_router(admin_accounts_router)
+app.include_router(shop_admin_router)
+app.include_router(shop_orders_admin_router)
+app.include_router(payment_anomalies_router)
+
+# 安家立业。库没配时整组不挂——挂了也只会在第一次请求时抛 RuntimeError，
+# 那时报错离配置缺失已经隔了很远，不如启动日志里的那句 warning 直白
+if anjia_db.configured():
+    app.include_router(anjia_users_router)
+    app.include_router(anjia_cases_router)
+    app.include_router(anjia_admin_router)
+    app.include_router(anjia_cases_admin_router)
 
 
 @app.exception_handler(RequestValidationError)

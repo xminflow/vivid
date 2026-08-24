@@ -2,16 +2,20 @@
 
 后端（FastAPI）、自建 Postgres、Caddy 三个容器跑在同一台腾讯云机器上，
 用 docker compose 编排。两份前端静态产物由 Caddy 直接托管，不单独打镜像。
+另有一个 `api-dev` 容器跑开发环境的接口，见下面「开发环境」。
 
 ```
                       ┌─ antonycasa.weelume.com ──────┬─ /api/* ─┐
 公网 :443 ──► caddy ──┤   （官网 antony-web）          └─ 其余 ──► /srv/site
                       │                                           │
-                      └─ admin.antonycasa.weelume.com ─┬─ /api/* ─┤► api:3000 ──► postgres:5432
-                          （后台 website）              └─ 其余 ──► /srv/admin
+                      ├─ admin.antonycasa.weelume.com ─┬─ /api/* ─┤► api:3000 ──► postgres:5432
+                      │   （后台 website）              └─ 其余 ──► /srv/admin
+                      │
+                      └─ dev.antonycasa.weelume.com ──── /api/* ──► api-dev:3000 ──► 腾讯云开发库
+                          （开发环境，只出接口）
 ```
 
-两个域名都要解析到这台机器（`43.137.6.100`），Caddy 分别自动签证书。
+三个域名都要解析到这台机器（`43.137.6.100`），Caddy 分别自动签证书。
 
 ## 这台机器的约束
 
@@ -173,6 +177,164 @@ wsl -d Ubuntu -- bash /mnt/d/code/vivid/server/deploy/deploy.sh --skip-build
 其他参数：`--proxy <url>` 让 docker build 走代理，`--logs` 部署完跟一段日志，
 `-H/-p/-i` 改目标主机、端口、私钥。
 
+## 开发环境（小程序预览 / 真机调试 / 体验版）
+
+`dev.antonycasa.weelume.com` 是**另一套后端**：容器叫 `api-dev`，跑
+`antony-casa-api:dev` 镜像，连**同一个 postgres 容器里的另一个库**
+`antony_casa_dev`，COS 用开发桶 `antony-casa-dev-1327365963`。
+
+为什么需要它：手机连不到开发机的 `127.0.0.1`，而微信只收备案域名下的 https，
+内网穿透绕不过这一条。所以预览、真机调试、体验版必须有一个公网可达的开发域名，
+小程序侧由 `antony-casa/utils/config.js` 的 `DEV_BASE` 指过来。
+
+三个隔离维度，缺一不可：
+
+| | 生产 `api` | 开发 `api-dev` |
+|---|---|---|
+| 镜像 tag | `latest` | `dev` |
+| 库 | `antony_casa` | `antony_casa_dev`（同一个 pg 实例） |
+| COS 桶 | `antonycasa-pro-…` | `antony-casa-dev-…` |
+| 超管账号 | `ADMIN_SUPER_*` | `DEV_ADMIN_SUPER_*`（另一套） |
+| `WORKER_ID` | 0 | 1 |
+| 日志级别 | INFO | DEBUG |
+
+tag 分开是关键的一条：常规 `deploy.sh` 会把本地构建的镜像推成 `latest` 并替换
+生产 `api`，而本地分支上通常有还没发布的代码。分开之后 `--dev-only` 只动 `api-dev`。
+
+**共用一个 postgres 实例**，只靠库隔离。这台机器就这点量，为开发环境再起一个 pg
+容器不值当；代价是开发环境跑飞了（大查询、锁表）会拖到生产，真出现就
+`docker compose stop api-dev`——停了不影响任何线上功能。
+
+### 当前状态
+
+`dev.antonycasa.weelume.com` **已经通了**（2026-08-12）：证书已签，公网
+`/health`、`/api/home`、`/api/shop/*` 全 200，返回的是开发库的空数据；
+小程序的 `DEV_BASE` 已指过去。
+
+还剩两件事：
+
+1. **`dev.admin.antonycasa.weelume.com` 的 A 记录还没建**（查 223.5.5.5 / 8.8.8.8
+   都没有）。所以下发到服务器的 `Caddyfile` 是**裁掉这个站点块**的版本，
+   与仓库里这份不一致——域名写进去但解析不过来，Caddy 会反复申请证书并失败，
+   刷满共享的容器日志。A 记录建好后跑一次就同步了：
+
+   ```bash
+   wsl -d Ubuntu -- bash /mnt/d/code/vivid/server/deploy/deploy.sh --dev-only
+   ```
+
+2. **公众平台加 request 合法域名**：「开发管理 - 开发设置 - 服务器域名」加上
+   `https://dev.antonycasa.weelume.com` 和开发桶
+   `https://antony-casa-dev-1327365963.cos.ap-shanghai.myqcloud.com`
+   （头像和申请图是客户端直传 COS 的，域名没加真机上传会被微信拦下，
+   errMsg 是 `url not in domain list`）。**预览版在真机上强制校验域名**，
+   开发者工具里「不校验合法域名」那个勾在手机上不作数
+
+### 怎么做到不影响生产的
+
+这套东西是加在**跑着生产的那台机器**上的，所以每一步都按「不碰已有服务」设计：
+
+- **另一个库**：`antony_casa_dev`，同一个 postgres 实例。`CREATE DATABASE` 是纯新增
+- **另一个容器 + 另一个镜像 tag**：`api-dev` / `antony-casa-api:dev`，
+  生产的 `api` 钉在 `latest` 上。`--dev-only` 只 `up -d api-dev`
+- **caddy 只 reload 不 restart**：先在容器里 `caddy validate`，再 `caddy reload`。
+  就算 reload 失败，Caddy 也会继续跑旧配置，连接不断
+- **caddy 的服务定义一个字都没改**：特意**没有**给它加 `depends_on: api-dev`
+  ——depends_on 属于服务定义，改了下一次全量 `up -d` 就会重建 caddy，
+  也就是 80/443 断几秒。caddy 是按请求解析上游的，不需要这个依赖
+- 部署脚本会在动手前后各记一次 `api` / `postgres` / `caddy` 的 `StartedAt` 和
+  `RestartCount` 做对照。上一次部署的结果是三者逐字节相同、`restarts=0`
+
+### 数据从哪来
+
+这个开发库和本地开发**不是同一个**：本地 `server/.env` 指的是腾讯云那个开发库，
+服务器上这个在容器内网、本地连不到（postgres 没映射宿主端口）。所以在电脑上造的
+数据，扫码预览时手机上看不到。
+
+要给预览环境造数据（上架商品、配首页图），打开
+**`https://dev.admin.antonycasa.weelume.com/`** —— 它出的是**同一份**后台管理产物
+（和 admin 域名是同一个 bind mount）。后台前端一律用相对路径请求 `/api/admin/*`，
+所以同一份 dist 在哪个域名下打开，管的就是那个域名背后的库。
+登录用 `.env` 里的 `DEV_ADMIN_SUPER_*`，和生产后台是两套账号。
+
+### 库是怎么建的
+
+`postgres` 镜像的 `POSTGRES_DB` 只建一个库，`schema.sql` 也只在首次建库时自动执行，
+所以开发库是手动建的（已经建好，这里留作换机器时的记录）：
+
+```bash
+ssh deploy@antonycasa.weelume.com
+cd /home/deploy/workspace/antony-casa && set -a && . ./.env && set +a
+
+# 建库（CREATE DATABASE 没有 IF NOT EXISTS，先查再建）
+docker compose exec -T postgres psql -tAqX -U "$POSTGRES_USER" -d postgres \
+  -c "SELECT 1 FROM pg_database WHERE datname='$DEV_POSTGRES_DB'" </dev/null
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres \
+  -c "CREATE DATABASE \"$DEV_POSTGRES_DB\" OWNER \"$POSTGRES_USER\"" </dev/null
+
+# 建表。schema.sql 是全量的（含 shop 三张表），新库只跑它一份就够，不用再跑 migrations/
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" \
+  -d "$DEV_POSTGRES_DB" < schema.sql
+```
+
+> ⚠️ 每条 `docker compose exec -T` 都要显式喂 stdin（文件或 `</dev/null`）。
+> `-T` 会把当前 stdin 透传进容器，在 `ssh host 'bash -s' <<EOF` 这类场景里漏一条，
+> 它就会把剩下的脚本当成 psql 的输入吃掉——表现是「跑到一半悄悄结束、退出码还是 0」。
+
+之后改表结构和生产一样是手动的，见上面「改表结构」，只是 `-d` 换成开发库。
+
+### 安家立业的库
+
+一库一个小程序（`docs/adr/0001`），所以安家立业还要**再建一个库**，基线是
+`schema.anjia.sql`。生产是 `anjia`、开发是 `anjia_dev`，都在同一个 postgres 容器里。
+
+**顺序不能反：先建库、跑完表，再往 `.env` 里填 `DATABASE_URL_ANJIA`。** 反了的话
+容器在启动期开池就失败，而 `api` 是官网、小程序、后台共用的一个容器——那等于把
+安东尼之家一起带下线。没填这一项时服务照常起，只是 `/api/anjia/*` 与
+`/api/admin/anjia/*` 不注册（启动日志里有一行 warning），后台的「安家立业」两页
+会 404。
+
+```bash
+ssh deploy@antonycasa.weelume.com
+cd /home/deploy/workspace/antony-casa && set -a && . ./.env && set +a
+
+# 1. 建库（CREATE DATABASE 没有 IF NOT EXISTS，先查再建）
+docker compose exec -T postgres psql -tAqX -U "$POSTGRES_USER" -d postgres \
+  -c "SELECT 1 FROM pg_database WHERE datname='anjia'" </dev/null
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres \
+  -c "CREATE DATABASE \"anjia\" OWNER \"$POSTGRES_USER\"" </dev/null
+
+# 2. 建表。schema.anjia.sql 可重复执行
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" \
+  -d anjia < schema.anjia.sql
+
+# 3. 这一步做完，才把 DATABASE_URL_ANJIA / WX_APPID_ANJIA / WX_SECRET_ANJIA
+#    填进 .env，然后 docker compose up -d api
+```
+
+`schema.anjia.sql` 和 `schema.sql` 一样由 `deploy.sh` scp 上去但**不执行**，
+改表结构同样是手动的（见上面「改表结构」，`-d` 换成 `anjia`）。
+
+开发环境同理，在 `~/workspace/antony-casa-dev/.env` 里配，库名用 `anjia_dev`，
+连接串的主机名是 `antony-casa-postgres`。
+
+### 日常
+
+```bash
+# 只更新开发环境，不碰生产（在 WSL 里）
+wsl -d Ubuntu -- bash /mnt/d/code/vivid/server/deploy/deploy.sh --dev-only
+
+docker compose logs -f api-dev        # 开发环境日志，默认 DEBUG
+docker compose up -d api-dev          # 只改了 DEV_* 配置时重启它
+docker compose stop api-dev           # 出问题时停掉，线上无感
+```
+
+部署脚本最后会分别探生产和开发两个 `/health`。两条都验是有意的：`--dev-only`
+理论上碰不到生产，而「理论上碰不到」正是要验一下的理由——compose 文件是整份同步
+过去的，改错一行就可能连带重建 `api`。
+
+**两边互不影响**：官网、后台、正式版小程序走 `api`；预览、体验版走 `api-dev`。
+排查生产问题时别看 `api-dev` 的日志，反之亦然。
+
 ## 看日志
 
 ```bash
@@ -207,6 +369,46 @@ docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" < sch
 `schema.sql` 全是 `IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`，可以重复执行。
 破坏性变更（删列、改语义、收紧约束）不要写进这个文件，按 CLAUDE.md 的数据升级规范
 单独出迁移脚本。
+
+**迁移脚本同理**，把 `schema.sql` 换成 `migrations/xxx.sql` 即可。两个环境**各跑一次**
+（生产 `-d "$POSTGRES_DB"`，开发 `-d antony_casa_dev`）——两个库在同一个 postgres
+容器里，但迁移不会自动传染。
+
+### 发「支付加固」这一支（012）
+
+```bash
+scp /mnt/d/code/vivid/server/migrations/012_payment_hardening.sql \
+    deploy@antonycasa.weelume.com:/home/deploy/workspace/antony-casa/
+
+ssh deploy@antonycasa.weelume.com
+cd /home/deploy/workspace/antony-casa && source .env
+# ① 生产库
+docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+  < 012_payment_hardening.sql
+# ② 开发库（同一个容器，另一个库）
+docker compose exec -T postgres psql -U "$POSTGRES_USER" -d antony_casa_dev \
+  < 012_payment_hardening.sql
+```
+
+**跑完、发代码之前**，两份 `.env` 各补一行 `ORDER_NO_PREFIX`：
+
+```bash
+# 生产
+echo 'ORDER_NO_PREFIX=AX' >> /home/deploy/workspace/antony-casa/.env
+# 开发
+echo 'ORDER_NO_PREFIX=AD' >> /home/deploy/workspace/antony-casa-dev/.env
+```
+
+⚠️ **开发那份漏了就等于没改**：不配会退回默认的 `AX`，两个环境继续发同名的商户
+订单号，开发环境的超时关单会去关生产上真实客户的订单。理由见
+[`../README.md`](../README.md) 的「支付与对账」。
+
+开发库里已有的 `AX` 开头待付款单（如果有）新代码不再扫，跑一次收掉：
+
+```sql
+UPDATE shop_orders SET status='closed', closed_at=now(), close_reason='never_submitted'
+ WHERE status='pending_pay' AND order_no LIKE 'AX%';   -- 只在开发库跑
+```
 
 ## 连库
 
@@ -316,7 +518,7 @@ ssh deploy@antonycasa.weelume.com 'cd /home/deploy/workspace/antony-casa &&
 
 ## 证书
 
-Caddy 给两个域名各自自动申请和续期，证书都在 `data/caddy/data/` 下。
+Caddy 给三个域名各自自动申请和续期，证书都在 `data/caddy/data/` 下。
 
 - **别删这个目录**：Let's Encrypt 对同一域名有每周 5 次的签发限制，反复重来会被锁
 - HTTP-01 校验走 80 端口，安全组必须放行 80；只放 443 签不下来
@@ -369,4 +571,8 @@ ssh deploy@antonycasa.weelume.com \
   没有拦截作用。桶权限收紧成私有读之后不用改代码，但要给 `static/` 前缀单独设
   公有读 ACL，否则小程序首页的品牌实拍图会全挂
 - 库没有自动备份，也没有异地副本
-- `.env` 里用的还是开发环境的 `WX_SECRET` 和 COS 开发桶密钥
+- ~~COS 用的是开发桶~~ 已完成：`.env` 的 `COS_BUCKET` 是 `antonycasa-pro-1327365963`。
+  改这一项只需要改 `.env` 再 `docker compose up -d api`，不用重新构建镜像；
+  改之前要先把库里已引用的对象搬到新桶，否则首页配图、头像、服务申请图当场全挂
+- `.env` 里用的还是开发环境的 `WX_SECRET`；`COS_SECRET_ID` / `COS_SECRET_KEY` 是
+  账号级密钥，对账号下所有桶都有读写权限，应换成只授权生产桶的子账号密钥

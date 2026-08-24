@@ -15,6 +15,7 @@ import sys
 
 import pytest
 
+from app.anjia import db as anjia_db
 from app.db import pool
 
 # Windows 上 asyncio 默认用 ProactorEventLoop，psycopg 的异步模式不认它
@@ -26,9 +27,18 @@ if sys.platform == "win32":
 
 @pytest.fixture(scope="session", autouse=True)
 async def db():
+    """两个小程序两个池，一起开一起关（docs/adr/0001）。
+
+    安家立业没配库时只开安东尼之家那个——tests/anjia/ 下的用例会自己 skip，
+    而不是让整个会话在收集阶段就失败。
+    """
     await pool.open(wait=True, timeout=10)
+    if anjia_db.configured():
+        await anjia_db.get_pool().open(wait=True, timeout=10)
     yield
     await pool.close()
+    if anjia_db.configured():
+        await anjia_db.get_pool().close()
 
 
 @pytest.fixture(scope="session")

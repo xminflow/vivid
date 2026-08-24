@@ -1,0 +1,121 @@
+# 开发环境的编排。**只有应用容器**，出在 dev.antonycasa.weelume.com 与
+# dev.admin.antonycasa.weelume.com 下。
+#
+# 它和生产是两个 compose 项目、两个目录、两份 .env：
+#
+#   ~/workspace/antony-casa/       项目 antony-casa      caddy · postgres · api
+#   ~/workspace/antony-casa-dev/   项目 antony-casa-dev  api
+#
+# 分开的理由不只是「看着清楚」：在同一个目录里 `docker compose down` 会把
+# caddy 和 postgres 一起停掉——有人进去只想重启开发环境，结果能把官网干下线。
+# 分成两个项目之后，在这个目录里做任何事都碰不到生产。
+#
+# ---------------------------------------------------------------------------
+# 共用的两样东西
+#
+# caddy    独占宿主机 80/443，只能有一个，它同时服务四个域名。所以 Caddyfile
+#          仍然在生产目录里——改开发环境的路由要去那边改，这是分家分不掉的部分。
+# postgres 一个实例装两个库（antony_casa / antony_casa_dev）。库之间是隔离的，
+#          但实例是同一个：开发环境跑飞了（大查询、锁表）会拖到生产，
+#          真出现就 `docker compose stop api`，停了不影响任何线上功能。
+#
+# 这个项目**不定义**这两个服务，而是接入生产项目已经建好的网络去访问它们。
+
+name: antony-casa-dev
+
+services:
+  api:
+    # tag 与生产的 latest 分开：生产跑发布过的代码，这里跑在做的代码。
+    # 同 tag 就等于每次更新开发环境都顺手把生产也换了
+    image: antony-casa-api:${API_TAG:-dev}
+    # 固定容器名，Caddyfile 靠它反代过来。跨 compose 项目时容器名是最稳的寻址方式：
+    # 服务名别名依赖 compose 给外部网络也加别名的行为，容器名则是 docker 自己保证的
+    container_name: antony-casa-api-dev
+    restart: unless-stopped
+    # 镜像由本地构建后 scp 过来 docker load，这台机器连不上 Docker Hub。
+    # never 让镜像缺失时立刻报错，好过卡在拉取上等超时
+    pull_policy: never
+    environment:
+      # 连生产项目里的那个 postgres 容器，另一个库。
+      # 用容器名而不是服务名 postgres：那个服务定义在另一个项目里
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@antony-casa-postgres:5432/${POSTGRES_DB}
+      # appid/secret 与生产同一套：小程序只有一个 appid，
+      # code2session 必须用它配套的 secret 才换得到 openid
+      WX_APPID: ${WX_APPID}
+      WX_SECRET: ${WX_SECRET}
+      # 安家立业的库与 appid。留空 = /api/anjia/ 那组接口不注册，其余照常。
+      # 连接串里的主机名同样用 antony-casa-postgres（那个 postgres 容器在另一个
+      # compose 项目里），库要先手动建出来并跑过 schema.anjia.sql，
+      # 见 deploy/README.md「安家立业的库」。⚠️ 先建库再填，反了容器起不来
+      DATABASE_URL_ANJIA: ${DATABASE_URL_ANJIA:-}
+      # appid 与生产**同一套**：安家立业也只有一个 appid，
+      # code2session 必须用它配套的 secret。理由与上面 WX_APPID 那条相同
+      WX_APPID_ANJIA: ${WX_APPID_ANJIA:-}
+      WX_SECRET_ANJIA: ${WX_SECRET_ANJIA:-}
+      # 发货通知的订阅消息模板 ID。不透传的话容器读不到，
+      # 表现是「配了也收不到通知」且不报错，见 app/wxnotice.py 的 configured()
+      WX_SHIP_TEMPLATE_ID: ${WX_SHIP_TEMPLATE_ID:-}
+      # 开发环境默认 DEBUG：预览出问题时靠这份日志定位，生产的 INFO 不够看
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+      # 与生产 api 的 0 错开。两边现在是不同的库，撞号不会冲突主键，
+      # 但将来若合并数据、或让它指向别的库，同号就会发出重复的雪花 id
+      WORKER_ID: ${WORKER_ID:-1}
+      COS_SECRET_ID: ${COS_SECRET_ID}
+      COS_SECRET_KEY: ${COS_SECRET_KEY}
+      COS_BUCKET: ${COS_BUCKET}
+      COS_REGION: ${COS_REGION}
+      # 后台超管。**不要和生产填成同一套**：dev 域名同样公网可达，
+      # 而且它也出后台管理页面，共用凭据等于把生产后台的口令多暴露一处。
+      # 两项缺一容器起不来并无限重启（只影响 dev 域名，生产不受影响）
+      ADMIN_SUPER_USERNAME: ${ADMIN_SUPER_USERNAME}
+      ADMIN_SUPER_PASSWORD: ${ADMIN_SUPER_PASSWORD}
+      # 微信支付。**商户号与密钥和生产是同一套**——微信支付没有沙箱，
+      # 在这里付的也是真钱（可以退）。只有回调地址按环境分，
+      # 否则开发环境的支付结果会被推到生产那个容器上去
+      WXPAY_MCHID: ${WXPAY_MCHID:-}
+      WXPAY_APIV3_KEY: ${WXPAY_APIV3_KEY:-}
+      WXPAY_CERT_SERIAL: ${WXPAY_CERT_SERIAL:-}
+      WXPAY_PUBLIC_KEY_ID: ${WXPAY_PUBLIC_KEY_ID:-}
+      WXPAY_NOTIFY_URL: ${WXPAY_NOTIFY_URL:-}
+      # 开发环境默认 AD，与生产的 AX 分开。两边同号会让这个环境的超时关单去关
+      # 生产上真实客户的订单，见 app/order_no.py 与 .env.example
+      ORDER_NO_PREFIX: ${ORDER_NO_PREFIX:-AD}
+      # 两把密钥走**文件路径**，不进环境变量。
+      #
+      # 这里填的是**容器内**的路径（下面 volumes 挂进来的），不是宿主路径——
+      # 填成宿主路径的话容器里找不到文件，而报错要到第一次下单才出现。
+      #
+      # 为什么不内联：PEM 是多行的，塞进 .env 要把换行写成字面量 \n，
+      # 粘错一次整个 .env 就被 compose 判为语法错误、那个目录里所有 compose
+      # 命令一起失败（这事真发生过）。而且环境变量在 `docker inspect` 和
+      # /proc/<pid>/environ 里都看得到，文件至少还有权限这一层。
+      # 内联的写法仍然支持（app/wxpay.py 里内联优先），本地开发用它更省事。
+      WXPAY_PRIVATE_KEY_PATH: ${WXPAY_PRIVATE_KEY_PATH:-}
+      WXPAY_PUBLIC_KEY_PATH: ${WXPAY_PUBLIC_KEY_PATH:-}
+    volumes:
+      # 微信支付的两把 PEM。只读挂载，容器不需要也不该改它们。
+      #
+      # ⚠️ 宿主上这两个文件是 644 而不是 600：容器里进程跑的是 uid 10001(app)，
+      # 文件属于 deploy(1000)，bind mount 原样保留 uid，600 的话容器读不到，
+      # 而 chown 成 10001 要 root（deploy 没有免密 sudo）。
+      # 这台机器只有 root 和 deploy 两个真实账号，且 deploy 在 docker 组里
+      # （本来就能读所有容器的环境变量），所以 644 与 600 的实际暴露面没有区别。
+      # 将来这台机器上多了别的账号，就要么给这个服务加 user: 映射到 1000，
+      # 要么改回内联到 .env（.env 是 600）。
+      - ./secrets:/run/secrets/wxpay:ro
+    networks:
+      - shared
+    logging:
+      driver: json-file
+      options:
+        # 50G 系统盘，日志不封顶迟早会把盘写满，连 ssh 都登不上。
+        # 开发环境是 DEBUG 级别，写得比生产快，更需要这个
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  # 生产项目建的那张网。external 表示「已经存在，不要创建也不要删除」——
+  # 在这个目录里 `docker compose down` 因此不会动到它，caddy 和 postgres 都安全
+  shared:
+    external: true
+    name: antony-casa_default

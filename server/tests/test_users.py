@@ -19,7 +19,8 @@ TEST_AVATAR_KEY = "uploads/avatar/20260804/0123456789abcdef0123456789abcdef.jpg"
 
 
 def fake_session(openid: str, unionid: str | None = None):
-    async def code2session(code: str) -> dict:
+    # 签名要跟真的一致：code2session 现在按小程序收 appid/secret（见 app/wechat.py）
+    async def code2session(code: str, appid: str = "", secret: str = "") -> dict:
         # code 原样带进 openid，一个测试里能造多个不同用户
         return {"openid": openid, "unionid": unionid, "session_key": "fake-session-key"}
 

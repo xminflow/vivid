@@ -2,6 +2,10 @@
 
 文档：https://developers.weixin.qq.com/miniprogram/dev/OpenApiDoc/user-login/code2Session.html
 appid / secret 在小程序后台「开发管理 - 开发设置」里，放 .env，不进版本库。
+
+一个进程装多个小程序，每个小程序一套 appid/secret，所以 code2session 收参数而不是
+读全局：拿错 appid 换来的是**另一个小程序的 openid 体系**，落库之后是认错人，
+而微信那边只会回一句 40029，看不出是配串了。
 """
 
 import os
@@ -20,13 +24,39 @@ class WeChatError(Exception):
         self.detail = detail
 
 
-async def code2session(code: str) -> dict:
-    """返回 {'openid': ..., 'unionid': ... | None, 'session_key': ...}。"""
-    # 在函数里读，不在导入时读：.env 是 db.py 导入时才加载的
-    appid = os.getenv("WX_APPID", "")
-    secret = os.getenv("WX_SECRET", "")
-    if not appid or not secret:
-        raise WeChatError("登录服务未配置", "缺少 WX_APPID / WX_SECRET，检查 .env")
+def credentials(suffix: str = "") -> tuple[str, str]:
+    """按小程序取 appid / secret。
+
+    suffix 为空是安东尼之家——它的变量没有后缀，是历史原因，见 docs/adr/0001。
+    安家立业传 "_ANJIA"。
+
+    在函数里读、不在导入时读：.env 是 db.py 导入时才加载的。
+
+    这里**不判空**：判空要抛异常，而测试是把 code2session 整个替掉的，凭据取不取
+    得到本来与它们无关；在这里拦一道会让整套测试凭空依赖一份真实的 .env。
+    缺配置由 code2session 报，见那边的 suffix 参数。
+    """
+    return os.getenv(f"WX_APPID{suffix}", "").strip(), os.getenv(f"WX_SECRET{suffix}", "").strip()
+
+
+async def code2session(code: str, appid: str, secret: str, suffix: str = "") -> dict:
+    """返回 {'openid': ..., 'unionid': ... | None, 'session_key': ...}。
+
+    suffix 只用来在缺配置时**点名到具体变量**。矩阵里每个小程序一套 appid/secret，
+    一句笼统的「缺少 appid / secret」会让人挨个变量去猜——真实发生过一次：安家立业
+    能连库、能起服务，只有 WX_SECRET_ANJIA 是空的，而前端只看得到一个 400。
+    """
+    missing = [
+        name
+        for name, value in ((f"WX_APPID{suffix}", appid), (f"WX_SECRET{suffix}", secret))
+        if not value
+    ]
+    if missing:
+        raise WeChatError(
+            "登录服务未配置",
+            f"server/.env 里缺少 {' 和 '.join(missing)}，"
+            "在微信公众平台「开发管理 → 开发设置」取值后填上",
+        )
 
     try:
         async with httpx.AsyncClient(timeout=5) as client:

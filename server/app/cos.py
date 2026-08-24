@@ -99,19 +99,26 @@ def object_url(key: str) -> str:
     return f"https://{host()}/{quote(key.lstrip('/'))}"
 
 
-def _build_key(prefix: str, scene: str, ext: str) -> str:
+def _build_key(prefix: str, scene: str, ext: str, suffix: str = "") -> str:
     """对象键由服务端生成，不用客户端传来的文件名。
 
     客户端文件名可能带路径分隔符、中文、超长串，直接当键会有目录穿越和编码问题。
     这里只保留场景前缀和白名单后缀，主体用 uuid，键一定是安全的 ASCII。
+
+    suffix 会以 `_` 接在 uuid 之后，同样只保留字母数字与 `-_`。它存在的理由是让
+    调用方能把一小段**不可篡改的元信息**焊进键里：键由服务端生成，客户端改一个
+    字符就指向一个不存在的对象，于是「键存在」本身就担保了这段元信息没被改过。
+    安家立业的案例图用它带宽高（见 app/anjia/cases.py 的 image_key_size）。
     """
     ext = ext.lower().lstrip(".")
     if ext not in ALLOWED_EXTS:
         raise ValueError(f"不支持的图片格式：{ext}")
 
     scene = "".join(c for c in scene if c.isalnum() or c in "-_") or "misc"
+    suffix = "".join(c for c in suffix if c.isalnum() or c in "-_")
     day = time.strftime("%Y%m%d", time.localtime())
-    return f"{prefix}/{scene}/{day}/{uuid.uuid4().hex}.{ext}"
+    stem = f"{uuid.uuid4().hex}_{suffix}" if suffix else uuid.uuid4().hex
+    return f"{prefix}/{scene}/{day}/{stem}.{ext}"
 
 
 def build_key(scene: str, ext: str) -> str:
@@ -119,7 +126,7 @@ def build_key(scene: str, ext: str) -> str:
     return _build_key(UPLOADS_PREFIX, scene, ext)
 
 
-def build_static_key(scene: str, ext: str) -> str:
+def build_static_key(scene: str, ext: str, suffix: str = "") -> str:
     """运营素材的对象键（后台配的首页图走这条）。
 
     与 build_key 只差一个前缀，但语义完全不同：static/ 下的对象要能被任何人直接
@@ -130,7 +137,7 @@ def build_static_key(scene: str, ext: str) -> str:
     README「上线前要做的」里把桶收紧成私有读时，static/ 必须单独设公有读 ACL，
     否则首页图全挂。
     """
-    return _build_key(STATIC_PREFIX, scene, ext)
+    return _build_key(STATIC_PREFIX, scene, ext, suffix)
 
 
 def sniff_image_ext(data: bytes) -> str | None:
@@ -146,6 +153,112 @@ def sniff_image_ext(data: bytes) -> str | None:
     # WEBP 是 RIFF 容器：前 4 字节 RIFF，第 8-12 字节是 WEBP，中间 4 字节是长度
     if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
         return "webp"
+    return None
+
+
+def image_size(data: bytes) -> tuple[int, int] | None:
+    """从图片的文件头读出 (宽, 高)；读不出来返回 None。
+
+    为什么手写而不是引 Pillow：只用得到这一个函数，而 Pillow 带 C 扩展、带一串
+    解码器的历史 CVE，为了两个整数把它拉进依赖不划算。仓库里 Signature v5 也是
+    同样的取舍手写的（见本文件开头）。
+
+    为什么服务端非算不可：双列瀑布流必须在图片**加载之前**就知道封面多高，否则
+    页面先塌成空白再被内容顶开。这个值若由小程序自报，任何人都能报一个 1×9999
+    把自己的卡片撑成一整列。
+
+    只认 sniff_image_ext 能认出的那三种。三种格式的头都在前几十个字节里，
+    调用方传整段字节进来即可，不需要流式解析。
+    """
+    ext = sniff_image_ext(data)
+    if ext == "png":
+        # IHDR 紧跟在 8 字节签名之后：4 字节长度 + 4 字节 "IHDR" + 宽高各 4 字节大端
+        if len(data) < 24:
+            return None
+        return (
+            int.from_bytes(data[16:20], "big"),
+            int.from_bytes(data[20:24], "big"),
+        )
+
+    if ext == "jpg":
+        return _jpeg_size(data)
+
+    if ext == "webp":
+        return _webp_size(data)
+
+    return None
+
+
+# JPEG 里带宽高的段。SOF0/1/2… 都算，但 C4（哈夫曼表）、C8（保留）、CC（算术编码
+# 表）这三个是同区间里的冒牌货，长得像 SOF 却不是
+_JPEG_SOF = {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF}
+
+
+def _jpeg_size(data: bytes) -> tuple[int, int] | None:
+    """顺着段链走到第一个 SOF 段。
+
+    宽高**不在**文件头的固定偏移上：JPEG 是一串变长的段，EXIF、色彩配置、缩略图
+    都可能排在前面，手机拍的图尤其如此。所以只能一段一段跳过去。
+    """
+    i = 2  # 跳过 SOI（FFD8）
+    n = len(data)
+    while i + 3 < n:
+        if data[i] != 0xFF:
+            return None
+        marker = data[i + 1]
+        # 段之间允许有任意多个 FF 作填充，逐个跳过
+        if marker == 0xFF:
+            i += 1
+            continue
+        # 这几个是独立标记，没有长度字段，跳 2 个字节就是下一段
+        if 0xD0 <= marker <= 0xD9 or marker == 0x01:
+            i += 2
+            continue
+        length = int.from_bytes(data[i + 2:i + 4], "big")
+        if length < 2:
+            return None
+        if marker in _JPEG_SOF:
+            # 段内布局：长度(2) + 精度(1) + 高(2) + 宽(2)。注意**高在前**
+            if i + 9 > n:
+                return None
+            return (
+                int.from_bytes(data[i + 7:i + 9], "big"),
+                int.from_bytes(data[i + 5:i + 7], "big"),
+            )
+        i += 2 + length
+    return None
+
+
+def _webp_size(data: bytes) -> tuple[int, int] | None:
+    """WebP 有三种子格式，宽高的存法各不相同。
+
+    小程序 wx.compressImage 出的是 jpg，这条路实际很少走到；但后台和第三方工具
+    传 webp 是合法的，认不出来就只能拒收，不如把三种都读了。
+    """
+    if len(data) < 30:
+        return None
+    fmt = data[12:16]
+
+    if fmt == b"VP8 ":  # 有损：同步码 9D 01 2A 之后是宽高，各 2 字节小端，低 14 位有效
+        if data[23:26] != bytes((0x9D, 0x01, 0x2A)):
+            return None
+        return (
+            int.from_bytes(data[26:28], "little") & 0x3FFF,
+            int.from_bytes(data[28:30], "little") & 0x3FFF,
+        )
+
+    if fmt == b"VP8L":  # 无损：签名 2F 之后 4 字节里，宽高各占 14 位，且都是「实际值 - 1」
+        if data[20] != 0x2F:
+            return None
+        bits = int.from_bytes(data[21:25], "little")
+        return ((bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1)
+
+    if fmt == b"VP8X":  # 扩展（带动画/透明通道）：画布宽高各 3 字节小端，同样是「实际值 - 1」
+        return (
+            int.from_bytes(data[24:27], "little") + 1,
+            int.from_bytes(data[27:30], "little") + 1,
+        )
+
     return None
 
 

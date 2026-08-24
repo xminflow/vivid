@@ -270,8 +270,22 @@ async def test_business_endpoints_require_login(client, path, method):
     路径里 `{slot}`、`{account_id}` 这类占位符随便填一个合法值——鉴权是路由器
     级别的依赖，在请求体解析、路径参数校验之前就生效，占位符填什么不影响这里
     断言的 401。
+
+    新加带路径参数的接口时要在下面的 format 里补上对应的键，否则这条用例会以
+    KeyError 报错——这是有意的，比悄悄跳过一条没被覆盖的路由好。
     """
-    url = path.format(slot="hero", account_id="1")
+    url = path.format(
+        slot="hero",
+        account_id="1",
+        appointment_id="1",
+        application_id="1",
+        category_id="1",
+        product_id="1",
+        order_id="1",
+        anomaly_id="1",
+        cert_id="1",
+        case_id="1",
+    )
     r = await client.request(method, url)
     assert r.status_code == 401, f"{method} {url}: {r.text}"
 

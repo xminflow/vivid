@@ -92,7 +92,8 @@ async def test_appointment_shows_up_in_admin_list(client):
     assert item["visitorType"] == "设计师"
     assert item["visitDate"] == FUTURE.isoformat()
     assert item["spaceId"] == "sala"
-    assert item["status"] == "new"
+    # 跟进状态已经删掉了，接口不该再出这个字段（见 migrations/007_drop_status.sql）
+    assert "status" not in item
     # client 带的是后台超管的 Bearer 头，不是小程序用户 token（后者走
     # /api/auth/login 发的、查的是 users.token），current_user_or_none 查不到
     # 匹配的用户就吞掉异常返回 None，所以这条提交照样没有归属人。真正的匿名
@@ -157,12 +158,6 @@ async def test_filters_narrow_the_result(client):
     items = mine(r.json())
     assert [it["phone"] for it in items] == ["13551000001"]
 
-    # 新提交的都是 new，筛已到店应该一条都没有
-    r = await client.get(
-        "/api/admin/appointments", params={"keyword": "1355100000", "status": "visited"}
-    )
-    assert mine(r.json()) == []
-
 
 async def test_visit_date_range_filters_on_visit_date(client):
     soon = date.today() + timedelta(days=1)
@@ -200,9 +195,6 @@ async def test_bad_query_params_are_rejected(client):
     assert r.status_code == 400, r.text
     assert r.json()["ok"] is False
 
-    r = await client.get("/api/admin/appointments", params={"status": "已到店"})
-    assert r.status_code == 400
-
     # 单页上限挡住，否则一次能把全部客户手机号拉走
     r = await client.get("/api/admin/appointments", params={"pageSize": 1000})
     assert r.status_code == 400
@@ -229,7 +221,7 @@ async def test_service_application_fields_come_back_as_submitted(client):
     assert item["serviceId"] == "design"
     # 各服务的表单字段整体存 jsonb，后台按字段 id 原样拿到
     assert item["fields"] == {"projectType": "住宅项目", "area": "120"}
-    assert item["status"] == "new"
+    assert "status" not in item
     assert item["images"] == {}
 
 
@@ -281,3 +273,88 @@ async def test_created_range_includes_today(client):
         params={"keyword": "13551000001", "createdFrom": today, "createdTo": today},
     )
     assert len(mine(r.json())) == 1
+
+
+# ---------------------------------------------------------------------------
+# 删除
+#
+# 没有软删除：删掉就是从库里没了。这几条测的就是「真的没了」，
+# 以及重复删不会假装成功——两个人同时开着列表时这是常态。
+
+
+async def test_delete_appointment_really_removes_it(client):
+    await client.post("/api/appointments", json=appointment(name="待删除"))
+    listed = await client.get("/api/admin/appointments", params={"keyword": "13551000001"})
+    items = mine(listed.json())
+    assert len(items) == 1
+    appointment_id = items[0]["id"]
+
+    r = await client.delete(f"/api/admin/appointments/{appointment_id}")
+    assert r.status_code == 200, r.text
+    assert r.json()["ok"] is True
+
+    listed = await client.get("/api/admin/appointments", params={"keyword": "13551000001"})
+    assert mine(listed.json()) == []
+
+    # 同一条再删一次要 404，不能装作成功——那样前端刷出来还在，看着像没生效
+    again = await client.delete(f"/api/admin/appointments/{appointment_id}")
+    assert again.status_code == 404, again.text
+    assert again.json()["ok"] is False
+
+
+async def test_delete_appointment_frees_the_phone_and_date_slot(client):
+    """删掉之后同一手机号同一天可以重新登记。
+
+    库上有 (phone, visit_date) 唯一索引，客户重复提交会 409。删除必须真的把行
+    删掉而不是打个标记，否则客户改主意想重约会一直被这条已经「不存在」的记录挡住。
+    """
+    first = await client.post("/api/appointments", json=appointment())
+    assert first.status_code == 201, first.text
+    assert (await client.post("/api/appointments", json=appointment())).status_code == 409
+
+    listed = await client.get("/api/admin/appointments", params={"keyword": "13551000001"})
+    appointment_id = mine(listed.json())[0]["id"]
+    assert (await client.delete(f"/api/admin/appointments/{appointment_id}")).status_code == 200
+
+    again = await client.post("/api/appointments", json=appointment())
+    assert again.status_code == 201, again.text
+
+
+async def test_delete_service_application_really_removes_it(client):
+    await client.post(
+        "/api/service-applications",
+        json=application(images={"floorplan": ["uploads/test/delete-check.jpg"]}),
+    )
+    listed = await client.get(
+        "/api/admin/service-applications", params={"keyword": "13551000001"}
+    )
+    items = mine(listed.json())
+    assert len(items) == 1
+    application_id = items[0]["id"]
+
+    r = await client.delete(f"/api/admin/service-applications/{application_id}")
+    assert r.status_code == 200, r.text
+
+    listed = await client.get(
+        "/api/admin/service-applications", params={"keyword": "13551000001"}
+    )
+    assert mine(listed.json()) == []
+
+    again = await client.delete(f"/api/admin/service-applications/{application_id}")
+    assert again.status_code == 404, again.text
+
+
+async def test_delete_does_not_touch_the_other_table(client):
+    """两条接口路径相近，别把 id 串到另一张表上去。"""
+    await client.post("/api/appointments", json=appointment())
+    await client.post("/api/service-applications", json=application())
+
+    listed = await client.get("/api/admin/appointments", params={"keyword": "13551000001"})
+    appointment_id = mine(listed.json())[0]["id"]
+    assert (await client.delete(f"/api/admin/appointments/{appointment_id}")).status_code == 200
+
+    # 服务申请那条还在
+    listed = await client.get(
+        "/api/admin/service-applications", params={"keyword": "13551000001"}
+    )
+    assert len(mine(listed.json())) == 1

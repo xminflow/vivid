@@ -18,7 +18,7 @@ from . import cos
 from .db import pool
 from .models import AvatarIn, LoginIn, ProfileIn
 from .snowflake import next_id
-from .wechat import WeChatError, code2session
+from .wechat import WeChatError, code2session, credentials
 
 router = APIRouter()
 
@@ -107,7 +107,8 @@ async def current_user_or_none(authorization: str = Header(default="")) -> dict 
 @router.post("/api/auth/login")
 async def login(body: LoginIn) -> dict:
     try:
-        session = await code2session(body.code)
+        # 空后缀 = 安东尼之家的 WX_APPID / WX_SECRET，见 wechat.credentials
+        session = await code2session(body.code, *credentials())
     except WeChatError as exc:
         if exc.detail:
             print(f"[login failed] {exc.detail}")
@@ -180,7 +181,7 @@ async def my_appointments(user: dict = Depends(current_user)) -> dict:
             await conn.execute(
                 """
                 SELECT id, name, phone, visitor_type, visit_date, party_size,
-                       purpose, note, space_id, status, created_at
+                       purpose, note, space_id, created_at
                   FROM appointments
                  WHERE user_id = %s
                  ORDER BY created_at DESC
@@ -201,7 +202,6 @@ async def my_appointments(user: dict = Depends(current_user)) -> dict:
             "purpose": row["purpose"],
             "note": row["note"],
             "spaceId": row["space_id"],
-            "status": row["status"],
             "createdAt": row["created_at"].isoformat(),
         }
         for row in rows

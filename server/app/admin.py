@@ -23,14 +23,13 @@ from .db import pool
 from .home import load_slots
 from .models import (
     HOME_SLOT_MAX,
-    AppointmentStatus,
     HomeMediaIn,
     HomeSlot,
     Purpose,
-    ServiceApplicationStatus,
     ServiceId,
     VisitorType,
 )
+from .paging import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, count_and_page, like_pattern
 
 logger = logging.getLogger(__name__)
 
@@ -38,66 +37,6 @@ logger = logging.getLogger(__name__)
 # 不需要记得加依赖也一样是受保护的。登录接口在 app/admin_auth.py，
 # 那是独立的 router，不受这一行影响
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(current_admin)])
-
-DEFAULT_PAGE_SIZE = 20
-# 单页上限。后台表格一屏放不下更多，且每条服务申请都要现签图片地址，
-# 页太大既没人看得完，也在做无用的签名计算
-MAX_PAGE_SIZE = 100
-
-# 关键字搜索里这几个字符对 LIKE 有特殊含义，用户搜「100%」不该匹配到所有人
-LIKE_ESCAPE_CHARS = ("\\", "%", "_")
-
-
-def _like_pattern(keyword: str) -> str:
-    """把用户输入转成 LIKE 的模式串，通配符按字面量处理。
-
-    转义符声明在 SQL 里（`ESCAPE '\\'`），Postgres 默认也是反斜杠，写出来是为了
-    不依赖 `standard_conforming_strings` 的当前取值。
-    """
-    escaped = keyword
-    for ch in LIKE_ESCAPE_CHARS:
-        escaped = escaped.replace(ch, f"\\{ch}")
-    return f"%{escaped}%"
-
-
-async def _count_and_page(
-    table: str,
-    columns: str,
-    conditions: list[str],
-    params: list[Any],
-    page: int,
-    page_size: int,
-) -> tuple[int, list[dict]]:
-    """先数总条数再取当页。
-
-    不用 `COUNT(*) OVER ()` 跟数据一起带出来：翻到超出范围的页时窗口函数没有行可返回，
-    总数会变成 0，前端的分页器会跳回第一页，看起来像数据丢了。
-    """
-    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-    try:
-        async with pool.connection() as conn:
-            total_row = await (
-                await conn.execute(f"SELECT count(*) AS total FROM {table} {where}", params)
-            ).fetchone()
-            rows = await (
-                await conn.execute(
-                    f"""
-                    SELECT {columns}
-                      FROM {table}
-                      {where}
-                     ORDER BY created_at DESC, id DESC
-                     LIMIT %s OFFSET %s
-                    """,
-                    [*params, page_size, (page - 1) * page_size],
-                )
-            ).fetchall()
-    except psycopg.Error:
-        # 不能只回一句「查询失败」了事：后台查不出来时，运维要能从日志里看到是哪条 SQL、
-        # 哪个筛选条件的问题
-        logger.exception("后台列表查询失败 table=%s where=%s params=%s", table, where, params)
-        raise HTTPException(status_code=500, detail="查询失败，请稍后再试") from None
-
-    return total_row["total"], rows
 
 
 @router.get("/appointments")
@@ -107,7 +46,6 @@ async def list_appointments(
     keyword: Annotated[str, Query(max_length=40)] = "",
     visitor_type: Annotated[VisitorType | None, Query(alias="visitorType")] = None,
     purpose: Purpose | None = None,
-    status: AppointmentStatus | None = None,
     visit_date_from: Annotated[date | None, Query(alias="visitDateFrom")] = None,
     visit_date_to: Annotated[date | None, Query(alias="visitDateTo")] = None,
 ) -> dict:
@@ -123,7 +61,7 @@ async def list_appointments(
     if keyword:
         # 姓名和手机号一个框搜完：运营手上要么有名字要么有号码，不该逼他们选字段
         conditions.append("(name ILIKE %s ESCAPE '\\' OR phone LIKE %s ESCAPE '\\')")
-        pattern = _like_pattern(keyword)
+        pattern = like_pattern(keyword)
         params += [pattern, pattern]
     if visitor_type:
         conditions.append("visitor_type = %s")
@@ -131,9 +69,6 @@ async def list_appointments(
     if purpose:
         conditions.append("purpose = %s")
         params.append(purpose)
-    if status:
-        conditions.append("status = %s")
-        params.append(status)
     if visit_date_from:
         conditions.append("visit_date >= %s")
         params.append(visit_date_from)
@@ -141,10 +76,10 @@ async def list_appointments(
         conditions.append("visit_date <= %s")
         params.append(visit_date_to)
 
-    total, rows = await _count_and_page(
+    total, rows = await count_and_page(
         "appointments",
         """id, name, phone, visitor_type, visit_date, party_size, purpose,
-           note, space_id, user_id, status, created_at""",
+           note, space_id, user_id, created_at""",
         conditions,
         params,
         page,
@@ -164,7 +99,6 @@ async def list_appointments(
             "spaceId": row["space_id"],
             # 雪花 ID 有 18 位，超过 JS 的 Number.MAX_SAFE_INTEGER，出接口必须转字符串
             "userId": str(row["user_id"]) if row["user_id"] is not None else None,
-            "status": row["status"],
             "createdAt": row["created_at"].isoformat(),
         }
         for row in rows
@@ -197,7 +131,6 @@ async def list_service_applications(
     page_size: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE, alias="pageSize")] = DEFAULT_PAGE_SIZE,
     keyword: Annotated[str, Query(max_length=40)] = "",
     service_id: Annotated[ServiceId | None, Query(alias="serviceId")] = None,
-    status: ServiceApplicationStatus | None = None,
     created_from: Annotated[date | None, Query(alias="createdFrom")] = None,
     created_to: Annotated[date | None, Query(alias="createdTo")] = None,
 ) -> dict:
@@ -212,14 +145,11 @@ async def list_service_applications(
     keyword = keyword.strip()
     if keyword:
         conditions.append("(name ILIKE %s ESCAPE '\\' OR phone LIKE %s ESCAPE '\\')")
-        pattern = _like_pattern(keyword)
+        pattern = like_pattern(keyword)
         params += [pattern, pattern]
     if service_id:
         conditions.append("service_id = %s")
         params.append(service_id)
-    if status:
-        conditions.append("status = %s")
-        params.append(status)
     if created_from:
         conditions.append("created_at >= %s")
         params.append(created_from)
@@ -229,9 +159,9 @@ async def list_service_applications(
         conditions.append("created_at < %s")
         params.append(created_to + timedelta(days=1))
 
-    total, rows = await _count_and_page(
+    total, rows = await count_and_page(
         "service_applications",
-        "id, service_id, name, phone, fields, images, status, created_at",
+        "id, service_id, name, phone, fields, images, created_at",
         conditions,
         params,
         page,
@@ -246,12 +176,89 @@ async def list_service_applications(
             "phone": row["phone"],
             "fields": row["fields"] or {},
             "images": _presign_images(row["images"]),
-            "status": row["status"],
             "createdAt": row["created_at"].isoformat(),
         }
         for row in rows
     ]
     return {"ok": True, "total": total, "page": page, "pageSize": page_size, "items": items}
+
+
+# ---------------------------------------------------------------------------
+# 删除线索
+#
+# 这两条是后台唯一会改动客户提交内容的接口，且**不可撤销**——没有软删除，
+# 删了就是从库里没了。这么定是因为运营要的就是「处理完的线索从列表里消失」，
+# 软删除会带来一个「已删除」的筛选项和一堆没人看的存量，等于把状态流转
+# 换个名字又做了一遍。二次确认放在前端（website/ 的两个列表页）。
+#
+# 权限与本文件其余接口一致：router 上挂的是 current_admin，普通管理员也能删。
+# 跟进线索本来就是运营的日常操作，收紧到超管会让这个功能没人用得上。
+
+
+@router.delete("/appointments/{appointment_id}")
+async def delete_appointment(appointment_id: int) -> dict:
+    """删掉一条展厅预约。
+
+    RETURNING 出姓名手机号是为了写日志：删除不可撤销，出了纠纷要能从日志里
+    查到「哪条记录、什么时候、被删掉了」。手机号只打后四位，日志文件不该留全量号码。
+    """
+    try:
+        async with pool.connection() as conn:
+            row = await (
+                await conn.execute(
+                    "DELETE FROM appointments WHERE id = %s RETURNING name, phone",
+                    (appointment_id,),
+                )
+            ).fetchone()
+    except psycopg.Error:
+        logger.exception("删除展厅预约失败 id=%s", appointment_id)
+        raise HTTPException(status_code=500, detail="删除失败，请稍后再试") from None
+
+    if row is None:
+        # 两个人同时开着列表，另一个先删掉了。前端据此提示并刷新，
+        # 不能装作删成功——那样列表刷出来还在，看着像没生效
+        raise HTTPException(status_code=404, detail="这条预约不存在，可能已被删除")
+
+    logger.info(
+        "删除展厅预约 id=%s name=%s phone=****%s", appointment_id, row["name"], row["phone"][-4:]
+    )
+    return {"ok": True}
+
+
+@router.delete("/service-applications/{application_id}")
+async def delete_service_application(application_id: int) -> dict:
+    """删掉一条服务申请。
+
+    客户传的图**不删**：对象键是随机的，留在桶里不会被谁猜到，而删对象是没法
+    回退的第二次不可逆操作——万一是误删记录，图还在桶里至少能捞回来。
+    清理由运维按 uploads/ 前缀对账，与首页配图的取舍一致（见 README）。
+    """
+    try:
+        async with pool.connection() as conn:
+            row = await (
+                await conn.execute(
+                    "DELETE FROM service_applications WHERE id = %s RETURNING name, phone, images",
+                    (application_id,),
+                )
+            ).fetchone()
+    except psycopg.Error:
+        logger.exception("删除服务申请失败 id=%s", application_id)
+        raise HTTPException(status_code=500, detail="删除失败，请稍后再试") from None
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="这条申请不存在，可能已被删除")
+
+    # 图片对象键一并记下来：将来要对账「哪些 uploads/ 对象已经没有记录引用了」，
+    # 日志是唯一的线索，记录本身已经没了
+    orphan_keys = [key for keys in (row["images"] or {}).values() for key in keys]
+    logger.info(
+        "删除服务申请 id=%s name=%s phone=****%s 遗留图片=%s",
+        application_id,
+        row["name"],
+        row["phone"][-4:],
+        orphan_keys,
+    )
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
@@ -341,8 +348,8 @@ async def _read_body_within_limit(request: Request) -> bytes:
     async for chunk in request.stream():
         size += len(chunk)
         if size > cos.MAX_UPLOAD_BYTES:
-            # 413 Payload Too Large。不写 status.HTTP_413_*：这个文件里 status
-            # 已经是「跟进状态」那个业务字段的名字，再引一个同名的会看混
+            # 413 Payload Too Large。这个文件里的状态码一律写字面量，
+            # 不引 fastapi.status——半数字半常量比统一用哪一种都更难读
             raise HTTPException(
                 status_code=413,
                 detail=f"图片不能超过 {cos.MAX_UPLOAD_BYTES // 1024 // 1024}MB",

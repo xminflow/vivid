@@ -11,6 +11,19 @@ dependencies = [
     "python-dotenv>=1.0",
     # 调微信 code2session 换 openid 用（原先只在测试里用）
     "httpx>=0.27",
+    # 微信支付 APIv3。官方只出 Java / PHP / Go 三种 SDK，Python 侧这个是事实标准。
+    #
+    # 为什么不手写：手写只需 cryptography 一个依赖，也更贴合本仓库手写 COS
+    # Signature v5、拒绝 python-multipart / bcrypt / cos-sdk 的一贯取向。但**回调
+    # 验签写错的后果是他人可伪造「支付成功」白拿走货**，而 COS 签名写错最多是上传
+    # 失败——两者不该用同一标准衡量。最容易漏且「测试全绿但形同虚设」的有三条：
+    # 验签串必须用原始请求体字节、必须校验 Wechatpay-Serial 与公钥 ID 一致、
+    # 必须校验时间戳窗口防重放。自造测试向量证明不了这三条（用自己的实现生成再用
+    # 自己的实现验证是自证），只有真实回调才能证伪，而那时面对的是真钱。
+    #
+    # 它是同步阻塞的，调用一律包进 anyio.to_thread（见 app/wxpay.py），
+    # 与 admin_auth.py 跑 scrypt 的处理一致。requests 与 cryptography 是它的依赖。
+    "wechatpayv3>=2.0.3",
 ]
 
 [dependency-groups]

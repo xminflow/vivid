@@ -1,11 +1,29 @@
-# antonycasa.weelume.com 的生产编排。三个服务：
+# antonycasa.weelume.com 的**生产**编排。三个服务：
 #
 #   caddy     ── 收 80/443，自动签 Let's Encrypt 证书；/api/* 反代到 api，
 #                其余路径出 website/ 的后台管理 SPA
-#   api       ── FastAPI，只在 compose 内网可见，不映射宿主端口
-#   postgres  ── 自建库，同样只在内网可见；数据在 pgdata 卷里
+#   api       ── FastAPI（生产），只在 compose 内网可见，不映射宿主端口
+#   postgres  ── 自建库，同样只在内网可见；数据在 ./data/postgres 下
 #
-# 这台机器连不上 Docker Hub（registry-1.docker.io 直连超时），三个镜像全部由
+# ---------------------------------------------------------------------------
+# 开发环境在**另一个目录、另一个 compose 项目**：
+#
+#   ~/workspace/antony-casa/       项目 antony-casa      本文件（caddy·postgres·api）
+#   ~/workspace/antony-casa-dev/   项目 antony-casa-dev  deploy/dev/docker-compose.yml
+#
+# 分开不只是为了看着清楚：混在一个目录里时，`docker compose down` 会把 caddy 和
+# postgres 一起停掉——有人进去只想重启开发环境，结果能把官网干下线。
+#
+# 两个环境仍然共用两样东西，这是分不掉的：
+#   caddy    独占宿主机 80/443，只能有一个，它同时服务四个域名（含两个 dev 域名）
+#   postgres 一个实例装两个库（antony_casa / antony_casa_dev）。库是隔离的，
+#            实例不是——开发环境跑飞了会拖到生产，真出现就把开发那个容器停掉
+#
+# 开发的容器接入本项目建的 antony-casa_default 网络（在那边声明为 external），
+# 所以 caddy 反代得到它、它也连得到 postgres。
+# ---------------------------------------------------------------------------
+#
+# 这台机器连不上 Docker Hub（registry-1.docker.io 直连超时），镜像全部由
 # 本地 deploy.sh 打包上传后 docker load。所以一律 pull_policy: never——
 # 镜像缺失时立刻报错，好过 compose 卡在拉取上等超时。
 
@@ -24,6 +42,15 @@ services:
     container_name: antony-casa-postgres
     restart: unless-stopped
     pull_policy: never
+    # 对外开放 5432。默认是不开的——容器只在 docker 网络里监听，本地要连得靠
+    # ssh 隧道（scripts/db_tunnel.sh）。开出来是为了图形客户端能直接连开发库。
+    #
+    # ⚠️ 这个实例里装着**生产库 antony_casa**，而 POSTGRES_USER 是 superuser。
+    # 端口一旦公网可达，这台机器的防火墙（firewalld 是 inactive 的）就不再是屏障，
+    # 唯一的闸门是**腾讯云安全组**——务必只放行固定来源 IP，不要开 0.0.0.0/0。
+    # 放开给全网的后果不是「有人可能猜到密码」，是生产订单数据随时可被读写。
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -36,7 +63,9 @@ services:
       # 建的匿名卷，容器一重建就没了——看着有卷，实际没持久化
       - ./data/postgres:/var/lib/postgresql
       # 官方镜像只在数据目录为空（也就是首次创建库）时执行这里的脚本。
-      # 之后改 schema 不会自动生效，要按 README「改表结构」一节手动跑
+      # 之后改 schema 不会自动生效，要按 README「改表结构」一节手动跑。
+      # 开发环境那个库（antony_casa_dev）同理：POSTGRES_DB 只建一个库，
+      # 它是后来手动 CREATE DATABASE + 跑 schema.sql 建起来的，见 README「开发环境」
       - ./schema.sql:/docker-entrypoint-initdb.d/10-schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -61,6 +90,25 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       WX_APPID: ${WX_APPID}
       WX_SECRET: ${WX_SECRET}
+      # 安家立业（第二个小程序）的库与 appid。一库一个小程序，见 docs/adr/0001。
+      #
+      # 三项默认留空，缺任何一个都不会影响启动——只是 /api/anjia/ 与
+      # /api/admin/anjia/ 整组接口不注册，启动日志里有一行 warning。这是有意的
+      # 降级：若缺配置就启动失败，那么这份代码一推上来、在有人去补 .env 之前，
+      # 安东尼之家的接口是整个挂掉的（见 app/anjia/db.py 的注释）。
+      #
+      # ⚠️ 填的是**容器内**能连通的连接串，主机名用服务名 postgres，不是 localhost。
+      # 而且那个库要先手动建出来并跑过 schema.anjia.sql（postgres 镜像的
+      # POSTGRES_DB 只建一个库），步骤见 deploy/README.md「安家立业的库」。
+      # 库不存在时容器会在启动期开池失败——那会连带安东尼之家一起起不来，
+      # 所以**先建库、再往 .env 里填这一项**，顺序不能反
+      DATABASE_URL_ANJIA: ${DATABASE_URL_ANJIA:-}
+      WX_APPID_ANJIA: ${WX_APPID_ANJIA:-}
+      WX_SECRET_ANJIA: ${WX_SECRET_ANJIA:-}
+      # 发货通知的订阅消息模板 ID。不透传的话，即便 .env 里填了容器也读不到，
+      # 表现是「配了模板但用户永远收不到发货通知」，而且不报任何错——
+      # wxnotice.configured() 直接返回 False，整个功能静默关闭
+      WX_SHIP_TEMPLATE_ID: ${WX_SHIP_TEMPLATE_ID:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       # 单实例部署，机器号固定 0。将来多实例必须逐实例不同，否则雪花 ID 会撞主键
       WORKER_ID: ${WORKER_ID:-0}
@@ -76,6 +124,26 @@ services:
       # 不给 :- 默认值：默认值会让某次忘了配的部署把后台悄悄开成固定口令
       ADMIN_SUPER_USERNAME: ${ADMIN_SUPER_USERNAME}
       ADMIN_SUPER_PASSWORD: ${ADMIN_SUPER_PASSWORD}
+      # 微信支付。六项缺任何一个，服务照常起，只是下单时返回「支付暂未开通」、
+      # 超时关单扫描不启动（启动日志会写明缺哪几项）
+      WXPAY_MCHID: ${WXPAY_MCHID:-}
+      WXPAY_APIV3_KEY: ${WXPAY_APIV3_KEY:-}
+      WXPAY_CERT_SERIAL: ${WXPAY_CERT_SERIAL:-}
+      WXPAY_PUBLIC_KEY_ID: ${WXPAY_PUBLIC_KEY_ID:-}
+      # 回调地址是**唯一按环境分**的一项，其余几项两个环境共用
+      # （微信支付没有沙箱，开发环境用的也是同一个真实商户号）
+      WXPAY_NOTIFY_URL: ${WXPAY_NOTIFY_URL:-}
+      # 订单号前缀。生产 AX、开发 AD，两边必须不同——两个环境共用同一个微信商户号，
+      # 不分前缀会发出同名的商户订单号，见 app/order_no.py 与 .env.example
+      ORDER_NO_PREFIX: ${ORDER_NO_PREFIX:-AX}
+      # 两把密钥走文件路径，填的是**容器内**路径（见下面 volumes）。
+      # 理由与开发环境那份相同，见 deploy/dev/docker-compose.yml 的注释
+      WXPAY_PRIVATE_KEY_PATH: ${WXPAY_PRIVATE_KEY_PATH:-}
+      WXPAY_PUBLIC_KEY_PATH: ${WXPAY_PUBLIC_KEY_PATH:-}
+    volumes:
+      # 微信支付的两把 PEM，只读。目录不存在时 docker 会以 root 建一个空目录，
+      # 那样容器里读不到文件但也不报错——所以 deploy.sh 会先把它建好
+      - ./secrets:/run/secrets/wxpay:ro
     logging: *logging
 
   caddy:
@@ -83,6 +151,10 @@ services:
     container_name: antony-casa-caddy
     restart: unless-stopped
     pull_policy: never
+    # 开发环境的容器在另一个项目里，depends_on 写不了它，也不需要——
+    # caddy 是按请求解析上游的，那个容器起没起来跟它的启动顺序无关。
+    # 顺带一提也**不要**为此改这一项：depends_on 是服务定义的一部分，
+    # 改了下一次全量 `up -d` 就会重建 caddy，也就是 80/443 断几秒
     depends_on:
       - api
     ports:
@@ -90,10 +162,19 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      # 两份 SPA 产物都走 bind-mount：换前端只要重传 dist，连 reload 都不用，
-      # file_server 每次请求直接读磁盘。site 是官网，admin 是后台管理
+      # 四份 SPA 产物都走 bind-mount：换前端只要重传 dist，连 reload 都不用，
+      # file_server 每次请求直接读磁盘。
+      #
+      # **生产和开发各一份，不共用**。共用的话「更新开发环境的后台」就等于
+      # 「换掉生产的后台」——开发环境要能验还没发布的前端改动，这是它存在的意义之一。
+      # 代价是 caddy 要多挂两个目录，而加挂载必须重建容器（80/443 断几秒）。
+      #
+      # 开发那两份在另一个目录（另一个 compose 项目），这里用相对路径跨过去。
+      # 那个项目自己不跑 caddy——caddy 独占 80/443，只能有一个
       - ./site/dist:/srv/site:ro
       - ./website/dist:/srv/admin:ro
+      - ../antony-casa-dev/site/dist:/srv/dev-site:ro
+      - ../antony-casa-dev/website/dist:/srv/dev-admin:ro
       # 证书和 ACME 账号。caddy 镜像没有声明 VOLUME，不显式挂这两个目录就是纯容器内
       # 临时数据，重建容器等于把证书扔了重签，而 Let's Encrypt 同域名每周只给 5 次
       - ./data/caddy/data:/data
