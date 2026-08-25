@@ -132,6 +132,7 @@ export function AppointmentsPage() {
               <TableHead className="w-32">手机号</TableHead>
               <TableHead className="w-28">来者身份</TableHead>
               <TableHead className="w-28">到访日期</TableHead>
+              <TableHead className="w-20">到访时间</TableHead>
               <TableHead className="w-16 text-right">人数</TableHead>
               <TableHead className="w-32">预约需求</TableHead>
               <TableHead className="w-20">来源</TableHead>
@@ -144,7 +145,7 @@ export function AppointmentsPage() {
               <SkeletonRows />
             ) : list.items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
                   没有符合条件的预约
                 </TableCell>
               </TableRow>
@@ -160,6 +161,10 @@ export function AppointmentsPage() {
                   <TableCell className="tabular-nums">{row.phone}</TableCell>
                   <TableCell>{row.visitorType}</TableCell>
                   <TableCell className="tabular-nums">{row.visitDate}</TableCell>
+                  <TableCell className="tabular-nums">
+                    {/* 加这个字段之前的记录只有日期，几点到得回访时再问 */}
+                    {row.visitTime ?? <span className="text-muted-foreground">未选</span>}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums">{row.partySize}</TableCell>
                   <TableCell>{row.purpose}</TableCell>
                   <TableCell>
@@ -211,6 +216,9 @@ export function AppointmentsPage() {
               <DetailField label="手机号">{detail.phone}</DetailField>
               <DetailField label="来者身份">{detail.visitorType}</DetailField>
               <DetailField label="到访日期">{detail.visitDate}</DetailField>
+              <DetailField label="到访时间">
+                {detail.visitTime ?? <span className="text-muted-foreground">（未选）</span>}
+              </DetailField>
               <DetailField label="到访人数">{detail.partySize} 人</DetailField>
               <DetailField label="预约需求">{detail.purpose}</DetailField>
               <DetailField label="提交人">

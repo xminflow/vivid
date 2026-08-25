@@ -7,6 +7,8 @@ export interface Appointment {
   visitorType: string
   /** YYYY-MM-DD */
   visitDate: string
+  /** HH:MM。到访时刻是后加的字段，之前的记录只有日期，这里为 null */
+  visitTime: string | null
   partySize: number
   purpose: string
   note: string
@@ -61,7 +63,7 @@ export type ServiceApplicationQuery = {
 // 首页配图
 
 /** 首页上的三个位置，与 server/app/models.py 的 HOME_SLOTS 逐字一致 */
-export type HomeSlot = 'hero' | 'showroom' | 'activity'
+export type HomeSlot = 'hero' | 'showroom' | 'activity' | 'share'
 
 /** 一张首页图。url 为 null 表示服务端没配 COS，拼不出可访问地址 */
 export interface HomeMediaItem {

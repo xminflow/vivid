@@ -11,29 +11,45 @@ import type { HomeMediaItem, HomeSlot } from './types'
 /**
  * 首页配图管理。
  *
- * 三个位置各自独立编辑、独立保存：一次保存就是整组替换，数组顺序即首页展示顺序
+ * 每个位置各自独立编辑、独立保存：一次保存就是整组替换，数组顺序即展示顺序
  * （服务端接口见 server/app/admin.py 的 /home-media）。
+ *
+ * 「小程序封面」不在首页上，但配置方式与首页图一模一样（同一张表、同一组接口），
+ * 所以放在同一页里，不另开一个菜单。
  *
  * 上传和保存是分开的两步：选完图先传到 COS 拿对象键，点「保存」才写进配置。
  * 这样运营可以先传几张、调完顺序再落地，中途关掉页面不会把首页改成一半的样子。
  */
 
-// 位置的展示信息。id 与 server/app/models.py 的 HOME_SLOTS 逐字一致
-const SLOTS: { id: HomeSlot; title: string; hint: string }[] = [
+// 位置的展示信息。id 与 server/app/models.py 的 HOME_SLOTS 逐字一致。
+// fallback 是「这一组空着时小程序显示什么」——各组的兜底不一样，不能共用一句话，
+// 不写出来运营会以为自己把首页删空了
+const SLOTS: { id: HomeSlot; title: string; hint: string; fallback: string }[] = [
   {
     id: 'hero',
     title: '首屏画廊',
     hint: '首页最上方自动轮播的整屏实拍。品牌标语压在图上，选图时留意下半部分别太花',
+    fallback: '小程序会改用代码里写死的兜底图',
   },
   {
     id: 'showroom',
     title: '展厅实拍',
     hint: '「展厅预约」下面左右滑动的一组图，顺序就是参观动线的顺序',
+    fallback: '小程序会改用代码里写死的兜底图',
   },
   {
     id: 'activity',
     title: '近期活动',
     hint: '整张海报铺在首页底部，页面不再另配文字，所以文案要直接做在图里',
+    fallback: '小程序会改用代码里写死的兜底图',
+  },
+  {
+    id: 'share',
+    title: '小程序封面',
+    hint:
+      '转发到聊天或群里时，卡片上的那张图，各页共用。微信按 5:4 居中裁剪、' +
+      '最短边不小于 300px，选图要考虑裁完还成不成立',
+    fallback: '转发卡片会沿用「首屏画廊」的第一张，也就是加这一组之前的样子',
   },
 ]
 
@@ -48,7 +64,7 @@ const FORMATS = 'JPG / PNG / WebP'
 
 type SlotState = Record<HomeSlot, HomeMediaItem[]>
 
-const EMPTY: SlotState = { hero: [], showroom: [], activity: [] }
+const EMPTY: SlotState = { hero: [], showroom: [], activity: [], share: [] }
 
 const keysOf = (list: HomeMediaItem[]) => list.map((it) => it.key).join('|')
 
@@ -60,6 +76,7 @@ export function HomeMediaPage() {
     hero: 0,
     showroom: 0,
     activity: 0,
+    share: 0,
   })
   // draft 是编辑中的状态，saved 是服务端当前的状态，两者比对得出「有没有未保存的改动」
   const [draft, setDraft] = useState<SlotState>(EMPTY)
@@ -69,7 +86,7 @@ export function HomeMediaPage() {
     setLoading(true)
     try {
       const body = await getHomeMedia()
-      const next: SlotState = { hero: [], showroom: [], activity: [] }
+      const next: SlotState = { ...EMPTY }
       for (const slot of SLOTS) next[slot.id] = body.slots[slot.id] ?? []
       setDraft(next)
       setSaved(next)
@@ -205,7 +222,7 @@ export function HomeMediaPage() {
 }
 
 interface SlotSectionProps {
-  slot: { id: HomeSlot; title: string; hint: string }
+  slot: { id: HomeSlot; title: string; hint: string; fallback: string }
   items: HomeMediaItem[]
   limit: number
   dirty: boolean
@@ -268,11 +285,11 @@ function SlotSection({
         手机拍的 HEIC 要先转成 JPG
       </p>
 
-      {/* 清空是「回到小程序里写死的兜底图」，不是「首页这块不显示」。
-          这个语义不摆出来，运营会以为自己把首页删空了 */}
+      {/* 清空是「回到这一组的兜底」，不是「这块不显示」。
+          兜底是什么各组不一样，由 slot.fallback 给 */}
       {dirty && items.length === 0 && (
         <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
-          保存后这一组将没有后台配置，小程序会改用代码里写死的兜底图。
+          保存后这一组将没有后台配置，{slot.fallback}。
         </p>
       )}
 
@@ -293,7 +310,7 @@ function SlotSection({
 
       {items.length === 0 ? (
         <p className="mt-3 text-sm text-muted-foreground">
-          还没配图，小程序这一块用的是代码里写死的兜底图。传图并保存后会改用这里配的。
+          还没配图，{slot.fallback}。传图并保存后会改用这里配的。
         </p>
       ) : (
         <div className="mt-3 flex flex-wrap gap-3">
