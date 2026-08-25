@@ -78,8 +78,8 @@ async def list_appointments(
 
     total, rows = await count_and_page(
         "appointments",
-        """id, name, phone, visitor_type, visit_date, party_size, purpose,
-           note, space_id, user_id, created_at""",
+        """id, name, phone, visitor_type, visit_date, visit_time, party_size,
+           purpose, note, space_id, user_id, created_at""",
         conditions,
         params,
         page,
@@ -93,6 +93,13 @@ async def list_appointments(
             "phone": row["phone"],
             "visitorType": row["visitor_type"],
             "visitDate": row["visit_date"].isoformat(),
+            # HH:MM，不出秒——这个字段是分钟粒度的选择器填的，秒恒为 0。
+            # 016 迁移之前的记录没有时刻，出 null，后台显示成「未选」
+            "visitTime": (
+                row["visit_time"].isoformat(timespec="minutes")
+                if row["visit_time"] is not None
+                else None
+            ),
             "partySize": row["party_size"],
             "purpose": row["purpose"],
             "note": row["note"],
@@ -273,7 +280,7 @@ UPLOAD_SCENE = "home-media"
 
 @router.get("/home-media")
 async def list_home_media() -> dict:
-    """三个位置的当前配置。带上 url 是为了后台能直接把图显示出来。"""
+    """每个位置的当前配置。带上 url 是为了后台能直接把图显示出来。"""
     try:
         slots = await load_slots()
     except psycopg.Error:

@@ -100,6 +100,19 @@ CREATE TRIGGER users_touch_updated_at
   BEFORE UPDATE ON users
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
+-- 微信手机号快速验证的每日配额，一个用户一行。
+--
+-- 那个接口按调用次数收费，而按钮在四个页面上、用户可以无限点，所以配额是这条链路
+-- 唯一真正护着账单的一层——客户端的按钮置灰对抓包重放毫无作用。
+-- 与 admin_login_attempts 同类：计数器，不是实体表，所以没有 snowflake 主键。
+-- 跨天不清表，写入时发现 quota_date 变了就归零，省掉一个定时任务。
+CREATE TABLE IF NOT EXISTS user_phone_quota (
+  user_id    bigint      PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+  quota_date date        NOT NULL,
+  used       integer     NOT NULL DEFAULT 0 CHECK (used >= 0),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- ============================================================
 -- 预约参观登记表
 -- ============================================================
@@ -113,6 +126,10 @@ CREATE TABLE IF NOT EXISTS appointments (
                               '业主', '设计师', '地产圈',
                               '家居圈', '酒店民宿圈', '艺术圈')),
   visit_date    date        NOT NULL,
+  -- 几点到。可为空：这一列是后加的（migrations/016），存量记录只有日期；
+  -- 不做营业时段的 CHECK——营业时间是运营会改的东西，写死在约束里改一次要跑一次
+  -- 迁移，可选范围由小程序的选择器卡（booking.js 的 OPEN_TIME / CLOSE_TIME）
+  visit_time    time,
   party_size    smallint    NOT NULL CHECK (party_size BETWEEN 1 AND 50),
   purpose       text        NOT NULL CHECK (purpose IN (
                               '展厅参观', '全案设计咨询', '装修建材订购',
@@ -132,8 +149,9 @@ CREATE TABLE IF NOT EXISTS appointments (
 -- 「删除记录」清理线索，已随 migrations/007_drop_status.sql 删除。
 -- 已经建好的库不会因为这里少了一行就把列删掉，要跑那个迁移脚本。
 
--- 上面的 CREATE TABLE 对已经建好的库不生效，user_id 得单独补
+-- 上面的 CREATE TABLE 对已经建好的库不生效，后加的两列得单独补
 ALTER TABLE appointments ADD COLUMN IF NOT EXISTS user_id bigint REFERENCES users (id);
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS visit_time time;
 
 -- 后台按提交时间倒序翻列表
 CREATE INDEX IF NOT EXISTS appointments_created_at_idx
@@ -184,19 +202,21 @@ CREATE INDEX IF NOT EXISTS service_applications_service_idx
 -- 首页配图。原先写死在小程序的 mock/home.js 里，换图要改代码 + 跑上传脚本，
 -- 运营自己动不了。挪进库后由后台「首页图片」页维护，小程序拉接口拿。
 --
--- 三个位置（slot）共用一张表：字段完全一样（一个对象键 + 一个顺序），
--- 拆三张表只是把同一份读写逻辑抄三遍。
+-- 几个位置（slot）共用一张表：字段完全一样（一个对象键 + 一个顺序），
+-- 一个位置拆一张表只是把同一份读写逻辑抄几遍。转发卡片的封面图（share）不在
+-- 首页上，但配置方式与首页图一模一样，也放在这张表里，不另起一套。
 --
 -- 业务主键用雪花 ID（app/snowflake.py 生成），与 users 表一致：
 -- 这批记录会随后台操作反复增删，自增 id 的空洞没有意义，将来多小程序合库也不撞。
 CREATE TABLE IF NOT EXISTS home_media (
   id          bigint      PRIMARY KEY,
 
-  -- 首页上的位置。值与 app/models.py 的 HomeSlot、小程序 mock/home.js 的字段对应
+  -- 位置。值与 app/models.py 的 HomeSlot、小程序 mock/home.js 的字段对应
   --   hero     首屏画廊
   --   showroom 展厅预约那一组实拍
   --   activity 近期活动海报
-  slot        text        NOT NULL CHECK (slot IN ('hero', 'showroom', 'activity')),
+  --   share    转发卡片的封面图（小程序封面），不在首页上，没配时用 hero 首图
+  slot        text        NOT NULL CHECK (slot IN ('hero', 'showroom', 'activity', 'share')),
 
   -- COS 对象键，不存 URL：桶和地域将来会变，存 URL 会全部失效。
   -- 这里的键一律在 static/ 前缀下——首页图要能被任何人直接加载，
@@ -219,6 +239,10 @@ CREATE INDEX IF NOT EXISTS home_media_slot_idx ON home_media (slot, sort_order, 
 -- 接口校验：接口将来加别的入口时不会漏掉这条
 CREATE UNIQUE INDEX IF NOT EXISTS home_media_activity_uniq
   ON home_media (slot) WHERE slot = 'activity';
+
+-- 转发卡片也只有一张配图，同理
+CREATE UNIQUE INDEX IF NOT EXISTS home_media_share_uniq
+  ON home_media (slot) WHERE slot = 'share';
 
 DROP TRIGGER IF EXISTS home_media_touch_updated_at ON home_media;
 CREATE TRIGGER home_media_touch_updated_at

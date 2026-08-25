@@ -97,9 +97,17 @@ with psycopg.connect(DATABASE_URL) as c:
 已经建好的库要跟上新增的表和约束，走 `migrations/` 下的脚本，同样用上面那条命令、
 把文件名换掉即可。每个脚本开头都写了前置条件、幂等性、回滚方式和验证 SQL。
 
-最近一条是 `012_payment_hardening.sql`（支付加固：订单号约束放宽到两位字母前缀、
-`shop_orders` 加 `sweep_attempts` / `last_pay_at` 两列、新增 `payment_anomalies` 表）。
-**必须在发布新代码之前跑**——新代码引用这几列，先发代码会让下单和超时扫描直接报错。
+最近一条是 `016_visit_time.sql`（预约表加 `visit_time`：到访时间精确到分钟）。
+**必须在发布新代码之前跑**——新代码的 INSERT 写这一列，先发代码会让预约提交直接 500。
+这一列可为空：存量记录只有日期，且服务端先上线的那几天旧版小程序不带这个字段。
+
+再往前是 `014_home_media_share.sql`（小程序封面：`home_media.slot` 放行 `share`）。
+**必须在发布新代码之前跑**——不跑的话运营一保存封面图就撞 CHECK，接口 500；跑了但还
+没发代码也不会有任何用户可见变化（见「首页配图」一节）。
+
+再往前是 `012_payment_hardening.sql`（支付加固：订单号约束放宽到两位字母前缀、
+`shop_orders` 加 `sweep_attempts` / `last_pay_at` 两列、新增 `payment_anomalies` 表），
+同样**必须在发布新代码之前跑**——新代码引用这几列，先发代码会让下单和超时扫描直接报错。
 跑完记得给这个环境配上 `ORDER_NO_PREFIX`（生产 `AX`、开发 `AD`，
 见「支付与对账」一节，不配会退回默认的 `AX`，两个环境就撞号了）。
 
@@ -115,8 +123,9 @@ with psycopg.connect(DATABASE_URL) as c:
 | GET | `/api/users/me` | 读当前用户资料，要带 token |
 | PUT | `/api/users/me` | 整份保存「我的信息」，要带 token |
 | PUT | `/api/users/me/avatar` | 换头像，传 COS 对象键，要带 token |
+| POST | `/api/users/me/phone` | 微信手机号快速验证，要带 token，见下面「手机号」 |
 | GET | `/api/users/me/appointments` | 当前用户自己的预约记录 |
-| GET | `/api/home` | 首页三组配图，见下面「首页配图」 |
+| GET | `/api/home` | 首页配图与转发封面，见下面「首页配图」 |
 | GET | `/api/shop/categories` | 安玺·集 启用中的分类 |
 | GET | `/api/shop/products` | 安玺·集 在售商品，分页 + `categoryId` / `keyword` |
 | GET | `/api/shop/products/{id}` | 安玺·集 商品详情，下架的回 404 |
@@ -132,7 +141,7 @@ with psycopg.connect(DATABASE_URL) as c:
 | DELETE | `/api/admin/appointments/{id}` | 删掉一条预约，不可撤销 |
 | GET | `/api/admin/service-applications` | 服务申请列表，分页 + 筛选 |
 | DELETE | `/api/admin/service-applications/{id}` | 删掉一条申请，不可撤销 |
-| GET | `/api/admin/home-media` | 首页三组配图的当前配置 |
+| GET | `/api/admin/home-media` | 各组配图的当前配置 |
 | PUT | `/api/admin/home-media/{slot}` | 整组替换某个位置的图 |
 | POST | `/api/admin/home-media/upload` | 传一张首页图，返回 COS 对象键 |
 
@@ -209,12 +218,16 @@ POST 请求体（小程序传驼峰，模型两边都收）：
   "phone": "13612345678",
   "visitorType": "酒店民宿圈",
   "visitDate": "2026-10-01",
+  "visitTime": "14:30",
   "partySize": 4,
   "purpose": "展厅参观",
   "note": "",
   "spaceId": "bagno"
 }
 ```
+
+`visitTime` 是 `HH:MM`，可以不传（`016` 之前的记录没有它，服务端先上线的那几天
+旧版小程序也不带）。传了且 `visitDate` 是今天时，不能是已经过去的时刻。
 
 返回码：`201` 成功 / `400` 校验不过 / `409` 同号同日重复 / `500` 服务端错误。
 
@@ -282,6 +295,36 @@ POST 请求体（小程序传驼峰，模型两边都收）：
 - 换头像不走 `PUT /api/users/me`：那个接口是整份覆盖 + 前端防抖，头像混进去会被反复重传，
   且表单里任一字段校验不过会连头像一起失败
 
+## 手机号
+
+`users.phone` 是**联系方式**，不是身份凭证：非唯一（一家人共用一个号很正常）、可为空、
+可随时改。登录身份始终是 openid，手机号只是为了配送和客服能联系上人。
+
+四个地方要填手机号——「我的信息」、预约参观、服务申请、收货地址——每一处都可以手动输入，
+也可以点行尾的「微信获取」直接取微信绑定的号（小程序侧是 `components/phone-get`）。
+
+```
+小程序 button open-type="getPhoneNumber" → 回调给一个一次性 code
+  → POST /api/users/me/phone {code}
+  → 服务端用 access_token 调 wxa/business/getuserphonenumber 换明文（app/wxphone.py）
+  → users.phone 为空时补上，已有值不动
+  → 回明文给小程序，填进当前那张表
+```
+
+- **走新版 code、不走 `encryptedData` 解密**：`app/wechat_token.py` 已有带缓存和单飞锁的
+  `access_token`，而旧版要从零写 AES 解密并处理 `session_key` 失效重试。代价是要求基础库
+  2.21.2+（2022 年初），低版本回调里没有 `code`，前端降级成提示手动输入
+- 取 `purePhoneNumber` 不取 `phoneNumber`：后者带 `+86`，过不了 `users.phone` 的 CHECK
+- **只在 `users.phone` 为空时回写**：用户很可能在给家人下单，总是覆盖会静默改掉他自己的号，
+  而他不会察觉。「我的信息」页不受这条限制——那里用户是在明确编辑自己的资料，值走
+  `PUT /api/users/me` 整份覆盖
+- ⚠️ **这个接口按调用次数收费**（免费额度与单价以公众平台「手机号快速验证」的当期公示为准）。
+  所以有 `user_phone_quota` 这张表：每人每天 `PHONE_DAILY_QUOTA` 次，超了回 429。
+  失败也算一次、不退——失败的调用同样可能计费，退了等于给重试留一个无上限的口子。
+  客户端按钮的 3 秒冷却只挡误触，对抓包重放没有作用
+- 手机号只在日志里脱敏（`wxphone.mask`，后四位），接口回明文：四个入口拿到它之后都要填进
+  表单再提交，脱敏等于把功能废掉
+
 ## 静态素材
 
 小程序主包上限 2MB，品牌实拍图占了 1.1MB。这些图不参与业务逻辑，换图也不该走发版，
@@ -313,13 +356,20 @@ uv run python scripts/upload_static.py --check  # 只校验线上可访问
 
 ## 首页配图
 
-小程序首页的三组图由后台维护，不用发版也不用跑上传脚本：
+小程序首页的几组图由后台维护，不用发版也不用跑上传脚本。上限见
+`app/models.py` 的 `HOME_SLOT_MAX`，接口也会把它带给后台，前端不写死：
 
-| slot | 首页上的位置 | 张数上限 |
+| slot | 位置 | 张数上限 |
 |---|---|---|
-| `hero` | 最上方自动轮播的整屏实拍 | 10 |
-| `showroom` | 「展厅预约」下面左右滑动的一组 | 12 |
-| `activity` | 底部整张铺开的活动海报 | 1（库上有唯一索引） |
+| `hero` | 首页最上方自动轮播的整屏实拍 | 5 |
+| `showroom` | 「展厅预约」下面左右滑动的一组 | 6 |
+| `activity` | 首页底部整张铺开的活动海报 | 1（库上有唯一索引） |
+| `share` | 转发卡片的封面图（小程序封面），**不在首页上** | 1（库上有唯一索引） |
+
+`share` 与其它几组的差别只在兜底：没配时不是用包内默认图，而是用 `hero` 的第一张
+——也就是加这个位置之前的行为（`migrations/014_home_media_share.sql`）。回退在小程序
+里做，接口对 `share` 只回答「有没有单独配过」。⚠️ 微信按 5:4 居中裁剪、最短边不小于
+300px，选图要考虑裁完还成不成立。
 
 链路：后台选图 → `POST /api/admin/home-media/upload`（**裸的图片字节**，不是 multipart，
 省一个 `python-multipart` 依赖；服务端按文件头认 JPG/PNG/WebP，不看文件名）→ 落到
@@ -332,7 +382,7 @@ uv run python scripts/upload_static.py --check  # 只校验线上可访问
 **「某个位置没配 = 用小程序里写死的兜底图」**（`antony-casa/mock/home.js`），不是
 「没配 = 不显示」。这条约定让三件事可以分开做，中间任何时刻首页都不会开天窗：
 
-1. 跑 `migrations/005_home_media.sql` 建表（表是空的，接口返回三个空数组）
+1. 跑 `migrations/005_home_media.sql` 建表（表是空的，接口每个位都返回空）
 2. 发布服务端 + 小程序（小程序拉到空配置，显示的还是原来那几张图）
 3. 运营在后台配图（这时才真正换掉）
 

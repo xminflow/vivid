@@ -23,6 +23,7 @@ def appointment(**overrides) -> dict:
         "phone": "13551000001",
         "visitorType": "设计师",
         "visitDate": FUTURE.isoformat(),
+        "visitTime": "14:30",
         "partySize": 2,
         "purpose": "展厅参观",
         "note": "",
@@ -91,6 +92,8 @@ async def test_appointment_shows_up_in_admin_list(client):
     assert item["name"] == "列表校验"
     assert item["visitorType"] == "设计师"
     assert item["visitDate"] == FUTURE.isoformat()
+    # 分钟粒度，不出秒
+    assert item["visitTime"] == "14:30"
     assert item["spaceId"] == "sala"
     # 跟进状态已经删掉了，接口不该再出这个字段（见 migrations/007_drop_status.sql）
     assert "status" not in item

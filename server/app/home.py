@@ -1,12 +1,17 @@
 """首页配图：小程序读，后台写（写在 app/admin.py）。
 
-原先这三组图写死在小程序的 `mock/home.js` 里，换图要改代码 + 跑上传脚本 + 发版。
+原先这几组图写死在小程序的 `mock/home.js` 里，换图要改代码 + 跑上传脚本 + 发版。
 挪进 `home_media` 表后，运营在后台自己换，小程序下次进首页就是新图。
 
 约定「某个位置没配 = 用包内默认图」而不是「没配 = 不展示」：
-库是空的（刚建完表、还没人配过）时，这个接口三个位都返回空数组，小程序按包内的
+库是空的（刚建完表、还没人配过）时，这个接口每个位都返回空，小程序按包内的
 `mock/home.js` 渲染——也就是和上线前完全一样。这条约定让建表、发服务、配图三步
 可以分开做，中间任何时刻首页都不会是空的。
+
+转发卡片的封面图（`share`）走的是同一条约定，只是它的「默认」不在包里而在库里：
+没单独配封面时小程序退回首屏画廊的第一张，也就是加这个位置之前的行为。所以这个
+接口对 `share` 只回答「有没有单独配过」，回退由小程序做（见 utils/homeMedia.js）——
+在这里替它兜底会让「配了封面」和「没配、正好首图也是这张」两种情况分不出来。
 
 地址是 COS 公开直链，不现签：首页图本来就是给所有访客看的，签名既没有保护作用，
 还会让地址每次都变、微信的图片缓存全部落空（同样的取舍见 cos.presign_get 的注释）。
@@ -54,13 +59,20 @@ async def load_slots() -> dict[str, list[dict]]:
 
 @router.get("/api/home")
 async def get_home() -> dict:
-    """小程序首页要的三组图。失败一律 500，由小程序回退到本地缓存。"""
+    """小程序要的几组配图。失败一律 500，由小程序回退到本地缓存。"""
     if not cos.configured():
         # 没配 COS 就拼不出可用地址。这里不能返回一堆拼半截的 URL——那会让首页
         # 变成一片裂图，且看不出是配置问题。返回空数组等价于「后台还没配」，
         # 小程序用包内默认图，同时把原因留在日志里
         logger.error("COS 未配置，/api/home 返回空配置，小程序将使用包内默认图")
-        return {"ok": True, "hero": [], "showroom": [], "activity": None, "updatedAt": None}
+        return {
+            "ok": True,
+            "hero": [],
+            "showroom": [],
+            "activity": None,
+            "share": None,
+            "updatedAt": None,
+        }
 
     try:
         slots = await load_slots()
@@ -72,6 +84,7 @@ async def get_home() -> dict:
         return [cos.object_url(row["image_key"]) for row in slots[slot]]
 
     activity = urls("activity")
+    share = urls("share")
     # 全部行里最新的一次改动时间。小程序不靠它做判断，是给排查用的：
     # 「后台明明改了、小程序还是旧图」时，一眼能看出拿到的是哪一版配置
     stamps = [row["updated_at"] for rows in slots.values() for row in rows]
@@ -82,5 +95,7 @@ async def get_home() -> dict:
         "showroom": urls("showroom"),
         # 活动位只有一张（库上有唯一索引），出参就给单值，省得小程序再取一次下标
         "activity": activity[0] if activity else None,
+        # 转发卡片封面，同样只有一张。没配就是 null，小程序退回 hero 首图
+        "share": share[0] if share else None,
         "updatedAt": max(stamps).isoformat() if stamps else None,
     }

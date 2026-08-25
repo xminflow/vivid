@@ -1,6 +1,6 @@
 """接口测试。需要 antony_casa 库可连，跑完会清掉自己造的数据。"""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -20,6 +20,7 @@ def form(**overrides) -> dict:
         "phone": "13550000001",
         "visitorType": "设计师",
         "visitDate": FUTURE,
+        "visitTime": "14:30",
         "partySize": 2,
         "purpose": "展厅参观",
         "note": "",
@@ -76,6 +77,43 @@ async def test_visit_date_cannot_be_in_the_past(client):
     r = await client.post("/api/appointments", json=form(visitDate=PAST))
     assert r.status_code == 400
     assert r.json()["message"] == "到访日期不能早于今天"
+
+
+async def test_visit_time_is_optional(client):
+    """服务端先于小程序上线的那几天，旧版本提交的表单没有这一项，必须照收。"""
+    payload = form(phone="13550000004")
+    payload.pop("visitTime")
+    r = await client.post("/api/appointments", json=payload)
+    assert r.status_code == 201, r.text
+
+
+async def test_visit_time_must_be_a_time(client):
+    r = await client.post("/api/appointments", json=form(visitTime="下午两点"))
+    assert r.status_code == 400
+    assert r.json()["message"] == "请选择到访时间"
+
+
+async def test_visit_time_today_cannot_be_in_the_past(client):
+    """日期那道只比到「天」，今天已经过去的钟点要靠这一道拦下。"""
+    r = await client.post(
+        "/api/appointments",
+        json=form(phone="13550000005", visitDate=date.today().isoformat(), visitTime="00:00"),
+    )
+    assert r.status_code == 400
+    assert r.json()["message"] == "到访时间已经过了，请重新选择"
+
+
+async def test_visit_time_today_in_the_future_is_accepted(client):
+    """23:59 之后跑这条会没有「今天还没到的时刻」可用，那时跳过——
+    这条测的是校验放行，不是营业时段。"""
+    if datetime.now().hour >= 23:
+        pytest.skip("当前时刻之后今天已无可选时间")
+    later = f"{datetime.now().hour + 1:02d}:00"
+    r = await client.post(
+        "/api/appointments",
+        json=form(phone="13550000006", visitDate=date.today().isoformat(), visitTime=later),
+    )
+    assert r.status_code == 201, r.text
 
 
 async def test_party_size_out_of_range(client):

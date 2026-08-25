@@ -8,22 +8,37 @@
 token 能过期、能重发、能吊销。
 """
 
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
 import psycopg
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 
-from . import cos
+from . import cos, wxphone
 from .db import pool
-from .models import AvatarIn, LoginIn, ProfileIn
+from .models import AvatarIn, LoginIn, PhoneCodeIn, ProfileIn
 from .snowflake import next_id
 from .wechat import WeChatError, code2session, credentials
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 # 登录态有效期。小程序用户不常主动登录，给足一个月，过期了前端静默重登
 TOKEN_TTL = timedelta(days=30)
+
+# 每人每天能调几次微信手机号快速验证。那个接口按次收费，这是唯一真正护着账单的一层。
+#
+# 20 次是「宽到不可能误伤、又把单人单日损失封死」的量：正常用户一天点不了 3 次
+# （四个表单各一次都还有富余），而封顶 20 次意味着一个账号刷满一天也就几毛钱。
+# 客户端的按钮置灰只挡误触，对抓包重放没有任何作用，所以这一层不能省。
+PHONE_DAILY_QUOTA = 20
+
+# 配额按东八区的自然日算，写死时区而不是用 current_date：current_date 取的是
+# 数据库会话的 TimeZone，库和应用不在一个容器里时那可能是 UTC——那样配额会在
+# 北京时间早上八点重置，对不上用户理解的「一天」
+_QUOTA_TODAY = "(now() AT TIME ZONE 'Asia/Shanghai')::date"
 
 # 出接口的字段。session_key、token 是密钥，openid 前端也用不上，都不在这里
 USER_COLUMNS = """
@@ -180,8 +195,8 @@ async def my_appointments(user: dict = Depends(current_user)) -> dict:
         rows = await (
             await conn.execute(
                 """
-                SELECT id, name, phone, visitor_type, visit_date, party_size,
-                       purpose, note, space_id, created_at
+                SELECT id, name, phone, visitor_type, visit_date, visit_time,
+                       party_size, purpose, note, space_id, created_at
                   FROM appointments
                  WHERE user_id = %s
                  ORDER BY created_at DESC
@@ -198,6 +213,12 @@ async def my_appointments(user: dict = Depends(current_user)) -> dict:
             "phone": row["phone"],
             "visitorType": row["visitor_type"],
             "visitDate": row["visit_date"].isoformat(),
+            # 同后台列表：HH:MM，老记录没有时刻，出 null
+            "visitTime": (
+                row["visit_time"].isoformat(timespec="minutes")
+                if row["visit_time"] is not None
+                else None
+            ),
             "partySize": row["party_size"],
             "purpose": row["purpose"],
             "note": row["note"],
@@ -271,3 +292,100 @@ async def update_avatar(body: AvatarIn, user: dict = Depends(current_user)) -> d
     # 本期先不做，靠后续的桶生命周期规则清理孤儿对象
     print(f"[avatar updated] user_id={user['id']} key={body.avatar_key}")
     return {"ok": True, "user": to_json(row)}
+
+
+async def _consume_phone_quota(conn: psycopg.AsyncConnection, user_id: int) -> int:
+    """占用一次今日配额，返回占用后的累计次数。
+
+    递增和归零整句下沉到这一条 SQL 里算，不在 Python 里「读出来 -> 判断 -> 写回去」：
+    并发的多次请求会都读到同一个旧值、各自 +1 写回，计数总共只前进 1 次而不是 N 次，
+    配额上限就被按并发数放大了。`INSERT ... ON CONFLICT DO UPDATE` 会给冲突行加锁，
+    并发请求在这条语句上自然排队。与 app/admin_auth.py 的登录失败计数同一套写法。
+
+    跨天靠 CASE 归零，不靠定时任务：定时任务没跑起来的后果是所有人被锁死一整天。
+    """
+    row = await (
+        await conn.execute(
+            f"""
+            INSERT INTO user_phone_quota (user_id, quota_date, used)
+            VALUES (%s, {_QUOTA_TODAY}, 1)
+            ON CONFLICT (user_id) DO UPDATE SET
+              quota_date = {_QUOTA_TODAY},
+              used = CASE WHEN user_phone_quota.quota_date = {_QUOTA_TODAY}
+                          THEN user_phone_quota.used + 1
+                          ELSE 1 END,
+              updated_at = now()
+            RETURNING used
+            """,
+            (user_id,),
+        )
+    ).fetchone()
+    return int(row["used"])
+
+
+@router.post("/api/users/me/phone")
+async def resolve_phone(body: PhoneCodeIn, user: dict = Depends(current_user)) -> dict:
+    """用 getPhoneNumber 的 code 换手机号明文，顺带在资料为空时补上。
+
+    ## 返回明文，不脱敏
+
+    这是用户**自己刚授权给你的、他自己的**号码，对他掩码没有意义；而且四个入口拿到
+    它之后都要填进表单再提交（预约要交它、地址要存它），脱敏等于把功能废掉。
+    脱敏只做在日志里，见 wxphone.mask。
+
+    ## 为什么只在 phone 为空时回写
+
+    用户很可能是在给别人下单（填家人的号），总是覆盖会静默改掉他自己的号，之后所有
+    表单都预填错号而他不会察觉。「我的信息」页不受这条限制：那里用户是在明确编辑
+    自己的资料，值会经 PUT /api/users/me 整份覆盖提交——那是他本人的意思。
+
+    ## 配额先扣再调
+
+    失败也算一次，不退。微信侧失败的调用同样可能计费，而失败退配额等于给攻击者
+    一个无上限的重试口子。
+    """
+    async with pool.connection() as conn:
+        used = await _consume_phone_quota(conn, user["id"])
+
+    if used > PHONE_DAILY_QUOTA:
+        logger.warning(
+            "手机号快速验证超出每日配额 user_id=%s used=%s quota=%s",
+            user["id"],
+            used,
+            PHONE_DAILY_QUOTA,
+        )
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS, "今日获取次数已用完，请手动输入"
+        )
+
+    try:
+        phone = await wxphone.get_phone_number(body.code)
+    except wxphone.PhoneError as exc:
+        # 不吞：微信那头的原因只进日志，给前端一句能直接弹的话
+        logger.error(
+            "手机号快速验证失败 user_id=%s %s", user["id"], exc.detail or exc.message
+        )
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, exc.message) from exc
+
+    try:
+        async with pool.connection() as conn:
+            row = await (
+                await conn.execute(
+                    "UPDATE users SET phone = %s WHERE id = %s AND phone = '' RETURNING id",
+                    (phone, user["id"]),
+                )
+            ).fetchone()
+    except psycopg.Error as exc:
+        # 回写失败不影响本次获取：号码已经拿到了，前端照样能填进表单。
+        # 但必须记下来，不能当没发生过
+        logger.error("手机号回写资料失败 user_id=%s %s", user["id"], exc)
+        row = None
+
+    logger.info(
+        "手机号快速验证 user_id=%s phone=%s 回写=%s 今日第 %s 次",
+        user["id"],
+        wxphone.mask(phone),
+        "是" if row else "否（资料里已有号码）",
+        used,
+    )
+    return {"ok": True, "phone": phone}

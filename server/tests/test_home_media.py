@@ -19,6 +19,7 @@ HERO_KEYS = [
     "static/home-media/20260101/testhero2.jpg",
 ]
 ACTIVITY_KEY = "static/home-media/20260101/testactivity.jpg"
+SHARE_KEY = "static/home-media/20260101/testshare.jpg"
 
 # 一段最小的合法 JPEG 头，够 sniff_image_ext 认出来
 JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"\x00" * 64
@@ -69,7 +70,7 @@ async def client(auth_headers):
 
 
 async def test_empty_config_falls_back_to_bundled_defaults(client):
-    """没配过时三个位都是空的——小程序据此用包内默认图，首页不会开天窗。"""
+    """没配过时每个位都是空的——小程序据此用包内默认图，首页不会开天窗。"""
     r = await client.get("/api/home")
     assert r.status_code == 200, r.text
     body = r.json()
@@ -78,6 +79,9 @@ async def test_empty_config_falls_back_to_bundled_defaults(client):
     assert body["hero"] == []
     assert body["showroom"] == []
     assert body["activity"] is None
+    # 封面位为空 = 「没单独配过」，小程序退回 hero 首图。接口不替它兜底，
+    # 否则「配了封面」和「没配、正好首图也是这张」两种情况分不出来
+    assert body["share"] is None
     assert body["updatedAt"] is None
 
 
@@ -108,6 +112,35 @@ async def test_activity_is_a_single_url_not_a_list(client):
 
     body = (await client.get("/api/home")).json()
     assert body["activity"] == cos.object_url(ACTIVITY_KEY)
+
+
+@pytest.mark.skipif(not cos.configured(), reason="没配 COS 时接口按约定返回空配置")
+async def test_share_cover_is_a_single_url_not_a_list(client):
+    """转发封面也是单值。小程序拿它当 onShareAppMessage 的 imageUrl，只要一张。"""
+    await client.put("/api/admin/home-media/share", json={"keys": [SHARE_KEY]})
+
+    body = (await client.get("/api/home")).json()
+    assert body["share"] == cos.object_url(SHARE_KEY)
+
+
+@pytest.mark.skipif(not cos.configured(), reason="没配 COS 时接口按约定返回空配置")
+async def test_share_cover_is_independent_of_hero(client):
+    """配了 hero 不等于配了封面：封面位仍然是 null，回退由小程序做。"""
+    await client.put("/api/admin/home-media/hero", json={"keys": HERO_KEYS})
+
+    body = (await client.get("/api/home")).json()
+    assert body["hero"] == [cos.object_url(key) for key in HERO_KEYS]
+    assert body["share"] is None
+
+
+async def test_clearing_the_share_cover_goes_back_to_null(client):
+    """清空封面 = 回到「没单独配过」，小程序重新用 hero 首图，不是不显示。"""
+    await client.put("/api/admin/home-media/share", json={"keys": [SHARE_KEY]})
+
+    r = await client.put("/api/admin/home-media/share", json={"keys": []})
+    assert r.status_code == 200, r.text
+
+    assert (await client.get("/api/home")).json()["share"] is None
 
 
 async def test_clearing_a_slot_restores_the_empty_state(client):
@@ -141,7 +174,7 @@ async def test_admin_list_carries_keys_and_limits(client):
     assert body["ok"] is True
     assert body["limits"] == HOME_SLOT_MAX
     assert [it["key"] for it in body["slots"]["hero"]] == HERO_KEYS
-    # 三个位置都要出现，哪怕是空的：后台据此渲染三个上传区
+    # 每个位置都要出现，哪怕是空的：后台据此渲染上传区
     assert set(body["slots"]) == set(HOME_SLOT_MAX)
 
     first = body["slots"]["hero"][0]
@@ -200,6 +233,15 @@ async def test_activity_takes_only_one_poster(client):
     r = await client.put(
         "/api/admin/home-media/activity",
         json={"keys": [ACTIVITY_KEY, "static/home-media/20260101/second.jpg"]},
+    )
+    assert r.status_code == 400, r.text
+
+
+async def test_share_takes_only_one_cover(client):
+    """转发卡片只有一张配图，同 activity（库上也有唯一索引）。"""
+    r = await client.put(
+        "/api/admin/home-media/share",
+        json={"keys": [SHARE_KEY, "static/home-media/20260101/second.jpg"]},
     )
     assert r.status_code == 400, r.text
 

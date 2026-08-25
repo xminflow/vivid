@@ -54,6 +54,7 @@ FIELD_MESSAGES = {
     "phone": "电话格式不正确",
     "visitorType": "请选择来者身份",
     "visitDate": "请选择到访日期",
+    "visitTime": "请选择到访时间",
     "partySize": "到访人数需在 1 至 50 之间",
     "purpose": "请选择预约需求",
     "note": "备注过长",
@@ -259,9 +260,9 @@ async def create_appointment(
                 await conn.execute(
                     """
                     INSERT INTO appointments
-                      (name, phone, visitor_type, visit_date, party_size, purpose,
-                       note, space_id, user_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                      (name, phone, visitor_type, visit_date, visit_time, party_size,
+                       purpose, note, space_id, user_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id, created_at
                     """,
                     (
@@ -269,6 +270,7 @@ async def create_appointment(
                         form.phone,
                         form.visitor_type,
                         form.visit_date,
+                        form.visit_time,
                         form.party_size,
                         form.purpose,
                         form.note,

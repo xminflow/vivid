@@ -1,7 +1,7 @@
 """表单模型。选项值必须与 schema.sql 的 CHECK 约束逐字一致。"""
 
 import re
-from datetime import date
+from datetime import date, datetime, time
 from typing import Annotated, Literal
 
 from pydantic import (
@@ -39,6 +39,10 @@ class AppointmentIn(BaseModel):
     phone: Annotated[Trimmed, Field(pattern=r"^1[3-9]\d{9}$")]
     visitor_type: VisitorType
     visit_date: date
+    # 到访时刻，可以没有。库里 016 迁移之前的记录都没有这一列；而且服务端要先于
+    # 小程序上线，那几天里旧版本提交的表单不带 visitTime，设成必填会把它们整片
+    # 挡在门外。新版小程序一定会带。
+    visit_time: time | None = None
     party_size: Annotated[int, Field(ge=1, le=50)]
     purpose: Purpose
     note: Annotated[Trimmed, Field(max_length=500)] = ""
@@ -51,6 +55,21 @@ class AppointmentIn(BaseModel):
         if v < date.today():
             raise ValueError("到访日期不能早于今天")
         return v
+
+    @model_validator(mode="after")
+    def visit_time_not_in_the_past(self) -> "AppointmentIn":
+        """选了今天的话，时刻也不能是已经过去的。
+
+        上面那道只比到「天」：今天下午三点填一个今天上午十点，它是拦不住的。
+        所以只在日期正好是今天时再比一次时刻，明天以后的任何时刻都合法。
+        """
+        if (
+            self.visit_time is not None
+            and self.visit_date == date.today()
+            and self.visit_time < datetime.now().time()
+        ):
+            raise ValueError("到访时间已经过了，请重新选择")
+        return self
 
     @field_validator("space_id")
     @classmethod
@@ -147,6 +166,19 @@ class ProfileIn(BaseModel):
         return parts[0], parts[1], parts[2]
 
 
+class PhoneCodeIn(BaseModel):
+    """getPhoneNumber 回调给的一次性 code，换手机号明文用。
+
+    与 LoginIn.code 不是同一个东西：那个来自 wx.login、换的是 openid，
+    这个来自 <button open-type="getPhoneNumber"> 的回调、换的是手机号。
+    两者都是一次性的，用过即废。
+    """
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    code: Annotated[Trimmed, Field(min_length=1, max_length=200)]
+
+
 # ---------------------------------------------------------------------------
 # 服务申请
 
@@ -201,15 +233,17 @@ class ServiceApplicationIn(BaseModel):
 # 首页配图
 
 # 与 schema.sql 的 home_media.slot CHECK 逐字一致
-HOME_SLOTS = ("hero", "showroom", "activity")
-HomeSlot = Literal["hero", "showroom", "activity"]
+HOME_SLOTS = ("hero", "showroom", "activity", "share")
+HomeSlot = Literal["hero", "showroom", "activity", "share"]
 
 # 每个位置最多放几张。数字按首页实际的版面定，不留「余量」——
 # 上限放宽只会让运营多传的图悄悄不显示，还不如在后台就拦住
 #   hero     首屏画廊五张
 #   showroom 展厅参观动线六张
 #   activity 首页是整张海报铺开、不是轮播，只能一张。库上也有唯一索引兜着
-HOME_SLOT_MAX = {"hero": 5, "showroom": 6, "activity": 1}
+#   share    转发卡片配图（小程序封面），一张。它不在首页上，只是共用同一张表
+#            和同一套读写逻辑；没配时小程序退回 hero 首图，见 app/home.py
+HOME_SLOT_MAX = {"hero": 5, "showroom": 6, "activity": 1, "share": 1}
 
 
 class HomeMediaIn(BaseModel):

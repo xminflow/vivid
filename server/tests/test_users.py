@@ -294,6 +294,7 @@ async def test_an_appointment_submitted_while_logged_in_belongs_to_the_user(clie
         "phone": "13559990001",
         "visitorType": "设计师",
         "visitDate": "2099-01-01",
+        "visitTime": "10:30",
         "partySize": 2,
         "purpose": "展厅参观",
     }
@@ -302,7 +303,10 @@ async def test_an_appointment_submitted_while_logged_in_belongs_to_the_user(clie
 
     mine = await client.get("/api/users/me/appointments", headers=auth)
     assert mine.status_code == 200
-    assert [item["phone"] for item in mine.json()["items"]] == ["13559990001"]
+    items = mine.json()["items"]
+    assert [item["phone"] for item in items] == ["13559990001"]
+    # 「我的」页要拿它拼出「2099.01.01 10:30」
+    assert items[0]["visitTime"] == "10:30"
 
 
 async def test_an_appointment_without_a_token_still_goes_through(client):
