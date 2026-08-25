@@ -25,8 +25,9 @@ const about = {
 }
 
 // 顶部画廊：只放实拍，不压字。
-// 第一张同时是各页转发卡片的配图（见 utils/homeMedia.js 的 shareImage），所以它还要
-// 经得住微信 5:4 居中裁剪、最短边不小于 300px——hero-01 是 1920x1440，够用
+// 第一张同时是各页转发卡片的兜底配图（后台没单独配「小程序封面」时用它，见
+// utils/homeMedia.js 的 shareImage），所以它还要经得住微信 5:4 居中裁剪、
+// 最短边不小于 300px——hero-01 是 1920x1440，够用
 const heroSlides = [
   { image: `${STATIC_BASE}/home/hero-01.jpg` },
   { image: `${STATIC_BASE}/home/hero-02.jpg` },

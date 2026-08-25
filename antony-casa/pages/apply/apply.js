@@ -72,6 +72,19 @@ Page({
     this.setData({ [`rows[${this.rowIndex(e)}].value`]: e.detail.value })
   },
 
+  // 与 onInput 写进同一个位置。rowIndex 从 data-i 取，所以这张表将来有几个手机号
+  // 字段都对得上，不用按 id 去猜是哪一行
+  onWxPhone(e) {
+    this.setData({ [`rows[${this.rowIndex(e)}].value`]: e.detail.phone })
+  },
+
+  // 授权走不通时由 phone-get 通知：这一行换回 input 并把光标落进去。
+  // 字段是数据驱动的，标记记在行上而不是页面上，将来有第二个手机号字段也对得上
+  onPhoneManual(e) {
+    const i = this.rowIndex(e)
+    this.setData({ [`rows[${i}].manual`]: true, [`rows[${i}].focus`]: true })
+  },
+
   onSelect(e) {
     const i = this.rowIndex(e)
     const index = Number(e.detail.value)

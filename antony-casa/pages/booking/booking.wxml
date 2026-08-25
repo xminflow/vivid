@@ -22,14 +22,27 @@
 
     <view class="row">
       <text class="label">您的电话</text>
+      <!-- 空态是个 button（点它弹微信授权），有值之后换成 input 直接改。
+           这里用 wx:if 而不是 hidden：自定义组件对 hidden 不生效，节点仍占位、
+           占位文案还露在外面。摘掉 phone-get 是安全的——切换只发生在授权回调
+           已经处理完之后（成功写值、或失败转手输），不会把还等着回调的组件销毁。
+           也不能反过来做成「input 上盖一层」：input 是原生组件，盖不住，见 phone-get -->
       <input
+        wx:if="{{form.phone || phoneManual}}"
         class="input"
         type="number"
         value="{{form.phone}}"
         placeholder="11 位手机号"
         placeholder-class="ph"
         maxlength="11"
+        focus="{{phoneFocus}}"
         bindinput="onPhoneInput"
+      />
+      <phone-get
+        wx:else
+        placeholder="11 位手机号"
+        bind:got="onWxPhone"
+        bind:manual="onPhoneManual"
       />
     </view>
 
@@ -57,6 +70,24 @@
       <view class="picker-row">
         <text class="label">到访日期</text>
         <text class="value {{form.visitDate ? '' : 'value-empty'}}">{{form.visitDate ? form.visitDate : '请选择'}}</text>
+        <text class="chevron">›</text>
+      </view>
+    </picker>
+
+    <!-- mode="time" 的选择器就是小时、分钟两列，start/end 卡在营业时段内，
+         滚不到打烊之后的钟点。没选过时先把游标停在开门时间上，
+         传空串它会从 00:00 起滚，那个点展厅没人 -->
+    <picker
+      class="row-picker"
+      mode="time"
+      start="{{openTime}}"
+      end="{{closeTime}}"
+      value="{{form.visitTime ? form.visitTime : openTime}}"
+      bindchange="onTimeChange"
+    >
+      <view class="picker-row">
+        <text class="label">到访时间</text>
+        <text class="value {{form.visitTime ? '' : 'value-empty'}}">{{form.visitTime ? form.visitTime : '请选择'}}</text>
         <text class="chevron">›</text>
       </view>
     </picker>
@@ -116,7 +147,7 @@
     >
       <text class="submit-text">{{submitting ? '提交中' : '提交预约'}}</text>
     </view>
-    <text class="foot-note">提交后我们会电话与您确认到访时间</text>
+    <text class="foot-note">提交后我们会电话与您确认到访安排</text>
   </view>
 
 </view>

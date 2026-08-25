@@ -1,4 +1,4 @@
-// 首页配图：后台配什么就显示什么。
+// 首页配图与转发封面：后台配什么就显示什么。
 //
 // 三层来源，优先级从高到低：
 //   1. 接口 GET /api/home —— 后台「首页图片」页配的，是唯一的事实来源
@@ -13,12 +13,14 @@
 // 代价说明：缓存兜底意味着断网时用户可能看到的是上一次的旧图。这是刻意的取舍，
 // 换的是首页永远不空白；每次拉取失败都会打 error 日志，不会悄悄咽掉。
 
-// 只接管三组图，文案仍在 mock/home.js。转发卡片配图不单列一项，直接复用 hero 首图：
-// 各页共用同一张品牌形象这点不变，只是这张图现在也跟着后台配置走（见下面的 shareImage）
+// 只接管图，文案仍在 mock/home.js。转发卡片的封面（share）后台可以单独配一张；
+// 没配就还是用 hero 首图——各页共用同一张品牌形象这点不变（见下面的 shareImage）
 const { send } = require('./http.js')
 const { heroSlides, showroom, activity } = require('../mock/home.js')
 
-// 带版本号：将来出参结构改了，旧缓存不会被当成新结构读进来
+// 带版本号：将来出参结构改了，旧缓存不会被当成新结构读进来。
+// v1 的缓存里没有 share 字段，读出来是 undefined，shareImage 照样退回 hero 首图，
+// 不会读出脏数据，所以加这个字段不用升版本号（升了反而白丢一次缓存）
 const CACHE_KEY = 'homeMedia.v1'
 
 // mock/home.js 里那份默认值，拆成和接口一致的形状，下面只走一套合并逻辑
@@ -85,13 +87,15 @@ function refresh() {
     const media = {
       hero: res.data.hero || [],
       showroom: res.data.showroom || [],
-      activity: res.data.activity || null
+      activity: res.data.activity || null,
+      share: res.data.share || null
     }
     console.debug(
-      '[homeMedia] 拉到配置 hero=%d showroom=%d activity=%s updatedAt=%s',
+      '[homeMedia] 拉到配置 hero=%d showroom=%d activity=%s share=%s updatedAt=%s',
       media.hero.length,
       media.showroom.length,
       media.activity ? '有' : '无',
+      media.share ? '有' : '无',
       res.data.updatedAt
     )
 
@@ -101,21 +105,23 @@ function refresh() {
 }
 
 /**
- * 转发卡片的配图：首页画廊的第一张，各页共用。
+ * 转发卡片的配图，各页共用。三层来源，优先级从高到低：
+ *   1. 后台「小程序封面」单独配的那张
+ *   2. 没配就用首页画廊的第一张 —— 加这个位置之前就是这么取的，行为不变
+ *   3. 都没有（后台什么都没配、或还没拉到过配置）就用包内默认首图
  *
  * 不指定 imageUrl 的话微信拿当前页面截图顶上，截到的可能是轮播随机某一张、也可能
  * 赶上图还没加载完的空白，卡片长什么样完全不可控，所以每个页面都要显式给一张。
  *
  * 只读缓存、不发请求：onShareAppMessage 必须同步返回，等不了网络。没缓存时
- * （用户冷启动直接进了非首页，还没人拉过 /api/home）用包内默认首图，就是后台
- * 配图之前的那张，卡片不会开天窗。
+ * （用户冷启动直接进了非首页，还没人拉过 /api/home）用包内默认首图，卡片不会开天窗。
  *
- * ⚠️ 微信按 5:4 居中裁剪、最短边不小于 300px。后台换首图会连带换掉所有页面的
- * 分享卡片，上传时要考虑裁成 5:4 之后画面还成不成立。
+ * ⚠️ 微信按 5:4 居中裁剪、最短边不小于 300px。没单独配封面时，后台换首图会连带
+ * 换掉所有页面的分享卡片，上传时要考虑裁成 5:4 之后画面还成不成立。
  */
 function shareImage() {
   const cached = readCache()
-  return pickList(cached && cached.hero, DEFAULTS.hero)[0]
+  return (cached && cached.share) || pickList(cached && cached.hero, DEFAULTS.hero)[0]
 }
 
 module.exports = { local, refresh, shareImage }

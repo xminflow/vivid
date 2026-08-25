@@ -1,0 +1,29 @@
+/* 这一格占的就是 input 原来的位置，尺寸和字都要跟各页的 .input / .ph 对齐，
+   否则空态和填完之后会「跳」一下。各页 .input 都是 flex:1 + 28rpx/42rpx，
+   .ph 都是 28rpx + --grigio-chiaro，这里照抄 */
+:host {
+  flex: 1;
+  min-width: 0;
+}
+
+/* button 默认居中且是 inline-block，得掰成跟 input 一样的左对齐块。
+   app.wxss 已经把边框、灰底、::after 抹掉了，这里只补排版 */
+.field {
+  display: block;
+  width: 100%;
+  height: 42rpx;
+  padding: 0;
+  text-align: left;
+  font-size: 28rpx;
+  line-height: 42rpx;
+  letter-spacing: var(--ls-meta);
+  color: var(--grigio-chiaro);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 点下去给一点反馈。空态看起来就是个占位符，没有反馈用户不确定这里能不能点 */
+.field-hover {
+  opacity: 0.5;
+}

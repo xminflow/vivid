@@ -24,7 +24,10 @@ Page({
     // 编辑已有的默认地址时，开关要禁掉：关掉它会让这个人一个默认地址都没有，
     // 而「取消默认」这个动作没有意义——要换默认地址是去另一条上点「设为默认」
     lockDefault: false,
-    submitting: false
+    submitting: false,
+    // 授权走不通时置上：手机号那一格从「微信获取」按钮换回可输入的 input
+    phoneManual: false,
+    phoneFocus: false
   },
 
   onLoad(query) {
@@ -68,6 +71,17 @@ Page({
 
   onInput(e) {
     this.setData({ [e.currentTarget.dataset.field]: e.detail.value })
+  },
+
+  // 收货人常常不是本人（送到父母家、送给朋友），所以这里拿到的号只填进这张表。
+  // 服务端不会拿它覆盖用户自己资料里已有的号码
+  onWxPhone(e) {
+    this.setData({ phone: e.detail.phone })
+  },
+
+  // 授权走不通时由 phone-get 通知：换回 input 并把光标落进去
+  onPhoneManual() {
+    this.setData({ phoneManual: true, phoneFocus: true })
   },
 
   onRegion(e) {

@@ -8,6 +8,9 @@ const homeMedia = require('../../utils/homeMedia.js')
 
 const BIRTHDAY_START = '1930-01-01'
 
+// 与预约、服务申请、收货地址三张表以及服务端的 users.phone CHECK 同一套规则
+const PHONE = /^1[3-9]\d{9}$/
+
 function todayStr() {
   const d = new Date()
   const pad = n => String(n).padStart(2, '0')
@@ -17,6 +20,12 @@ function todayStr() {
 function formatDate(s) {
   const parts = String(s || '').split('-')
   return parts.length === 3 ? parts.join('.') : s
+}
+
+// 「2026.09.01 14:30」。加时刻之前的记录只有日期，那时候就只显示日期
+function formatVisit(date, time) {
+  const day = formatDate(date)
+  return time ? `${day} ${time}` : day
 }
 
 // 顶部只露一个号码，中间四位打码
@@ -46,6 +55,9 @@ Page({
     genders,
     profile: profileStore.EMPTY,
     regionText: '',
+    // 授权走不通时置上：手机号那一格从「微信获取」按钮换回可输入的 input
+    phoneManual: false,
+    phoneFocus: false,
     initial: '',
     phoneMasked: '',
     // 头像地址是有时效的，拉不出来时先退回首字，见 onAvatarError
@@ -111,7 +123,7 @@ Page({
     this.setData({
       records: rows.map(r => ({
         ...r,
-        dateText: formatDate(r.visitDate)
+        dateText: formatVisit(r.visitDate, r.visitTime)
       }))
     })
   },
@@ -189,6 +201,31 @@ Page({
 
   onPhoneInput(e) {
     this.saveField('phone', e.detail.value)
+  },
+
+  // 这一页没有「提交」按钮，改一个字段就自动存，所以校验只能落在失焦这一刻。
+  //
+  // 不拦保存、只提示：拦下来就得处理「用户填一半就切走」，而填一半是这页的常态。
+  // 服务端那条 CHECK 会挡住格式不对的值，profile.js 的 flush 把失败吞掉了——
+  // 没有这句提示的话，用户会以为存上了
+  onPhoneBlur(e) {
+    const phone = String(e.detail.value || '').trim()
+    if (phone && !PHONE.test(phone)) {
+      wx.showToast({ title: '手机号格式不正确', icon: 'none', duration: 2400 })
+    }
+  },
+
+  // 「微信获取」走的是和手输一样的那条路：saveField 落本机 + 防抖上传。
+  //
+  // 服务端那个接口只在资料里没号码时才回写，但这里用户是在**明确编辑自己的资料**，
+  // 换号就该覆盖——所以照常走 PUT /api/users/me 整份提交，把新号盖上去
+  onWxPhone(e) {
+    this.saveField('phone', e.detail.phone)
+  },
+
+  // 授权走不通时由 phone-get 通知：换回 input 并把光标落进去
+  onPhoneManual() {
+    this.setData({ phoneManual: true, phoneFocus: true })
   },
 
   onEmailInput(e) {

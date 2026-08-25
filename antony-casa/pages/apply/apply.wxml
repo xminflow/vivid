@@ -15,7 +15,20 @@
       <!-- 单行输入：text / phone / number -->
       <view class="row" wx:if="{{item.type === 'text' || item.type === 'phone' || item.type === 'number'}}">
         <text class="label">{{item.label}}<text class="req" wx:if="{{item.required}}">＊</text></text>
+        <!-- 手机号那一行空态时是个 button（点它弹微信授权），有值之后换成 input。
+             用 wx:if 而不是 hidden：自定义组件对 hidden 不生效，节点仍占位、
+             占位文案还露在外面。摘掉 phone-get 是安全的——切换只发生在授权回调
+             已经处理完之后，不会把还等着回调的组件销毁。
+             也不能反过来做成「input 上盖一层」：input 是原生组件，盖不住 -->
+        <phone-get
+          wx:if="{{item.type === 'phone' && !item.value && !item.manual}}"
+          placeholder="{{item.placeholder || '11 位手机号'}}"
+          data-i="{{i}}"
+          bind:got="onWxPhone"
+          bind:manual="onPhoneManual"
+        />
         <input
+          wx:else
           class="input"
           type="{{item.type === 'text' ? 'text' : (item.type === 'phone' ? 'number' : 'digit')}}"
           value="{{item.value}}"
@@ -23,6 +36,7 @@
           placeholder-class="ph"
           maxlength="{{item.type === 'phone' ? 11 : (item.maxlength || 40)}}"
           data-i="{{i}}"
+          focus="{{item.focus}}"
           bindinput="onInput"
         />
         <text class="unit" wx:if="{{item.unit}}">{{item.unit}}</text>

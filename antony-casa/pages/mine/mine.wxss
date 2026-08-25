@@ -123,22 +123,6 @@
   color: var(--grigio);
 }
 
-/* 上下布局里箭头落在文字下方，所以默认就转成向下（展开），
-   展开后再转到向上（收起）。这里要压过公共的 .sec-mark-on */
-.me-mark {
-  display: block;
-  margin-top: 16rpx;
-  font-size: 30rpx;
-  line-height: 1;
-  color: var(--grigio-chiaro);
-  transform: rotate(90deg);
-  transition: transform 220ms ease;
-}
-
-.me-mark.sec-mark-on {
-  transform: rotate(270deg);
-}
-
 /* ---------- 折叠段 ---------- */
 /* 收起时整页只剩四行标题加四道细线，留白给足，一眼看完有哪些东西 */
 

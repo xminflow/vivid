@@ -1,4 +1,6 @@
 {
-  "usingComponents": {},
+  "usingComponents": {
+    "phone-get": "/components/phone-get/phone-get"
+  },
   "navigationBarTitleText": "预约参观"
 }

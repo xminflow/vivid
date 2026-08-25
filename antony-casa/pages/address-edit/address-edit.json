@@ -1,4 +1,6 @@
 {
-  "usingComponents": {},
+  "usingComponents": {
+    "phone-get": "/components/phone-get/phone-get"
+  },
   "navigationBarTitleText": "收货地址"
 }

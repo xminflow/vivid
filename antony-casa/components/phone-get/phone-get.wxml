@@ -1,0 +1,18 @@
+<!--phone-get 手机号空态。长得跟一个空输入框一样，但它是 button——点下去弹微信授权。
+
+    为什么是「替换 input」而不是「盖在 input 上」：
+    input 是**原生组件**，官方明确写「原生组件的层级是最高的，页面中其他组件无论
+    z-index 设多少都无法盖在上面」。透明遮罩在开发者工具里能吃到点击（工具是用
+    web 组件模拟原生组件的），一到真机点击就直接穿到 input 上，授权永远调不起来。
+    所以空态这一格必须由 button 本体占着，页面那个 input 这时根本不渲染。
+
+    getPhoneNumber 只能挂在 button 上、且必须由用户真实点击触发，没有任何 API
+    能从 input 的 focus/tap 里把它唤起来——这是整个设计绕不开的约束。-->
+<button
+  class="field"
+  open-type="getPhoneNumber"
+  hover-class="field-hover"
+  hover-stay-time="120"
+  bindtap="onTap"
+  bindgetphonenumber="onGetPhoneNumber"
+>{{placeholder}}</button>
