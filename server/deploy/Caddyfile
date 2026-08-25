@@ -36,6 +36,46 @@
 	respond @dotfiles 404
 }
 
+# 静态产物的托管与缓存。四个站点共用一份，只有 root 各自不同。
+#
+# 缓存按两类分，不能一刀切：
+#   /assets/*   文件名带内容 hash（vite 出的），内容永不变 → 存一年
+#   其余        index.html 和所有 SPA 深链接回落 → no-cache，每次回源校验
+#
+# index.html 被缓存住的后果不是「看到旧页面」这么直白：它指向的
+# /assets/index-<旧hash>.js 已经随发版删掉了，而下面的 SPA 回落会把这个 404
+# 变成「200 + index.html」——浏览器请求 .js 收到一份 HTML，控制台里只有一句
+# MIME 类型错误，页面就静悄悄停在上一个版本，看着像压根没发布。
+# 2026-08-25 发后台时踩过一次，访问日志里是：
+#   GET /assets/index-C6kN7nxC.js -> 200 text/html (484 字节)
+#
+# 同一个理由，/assets/ 下找不到的文件直接 404，不让它走回落：
+# 一个诚实的 404 比一份伪装成 JS 的 HTML 好查得多。回落只对页面路径有意义。
+#
+# 必须整段包在 route 里：route 严格按书写顺序执行，散着写的话 Caddy 会按默认
+# 指令顺序重排，respond 排到 file_server 后面就永远轮不到它。
+(spa) {
+	route {
+		# 先把「产物不存在」挡掉，再谈缓存。顺序反过来的话这个 404 会带上
+		# 下面那条一年期的 immutable，浏览器就把「这个文件不存在」缓存一年——
+		# 发版时若有人正好在新 index.html 和新产物之间的那一瞬间刷新，
+		# 他那台机器就再也拉不到那个文件了。
+		@asset_missing {
+			path /assets/*
+			not file
+		}
+		respond @asset_missing 404
+
+		@asset path /assets/*
+		@page not path /assets/*
+		header @asset Cache-Control "public, max-age=31536000, immutable"
+		header @page Cache-Control "no-cache"
+
+		try_files {path} /index.html
+		file_server
+	}
+}
+
 # 官网和后台重复的部分，改一处两边同时生效
 (shared) {
 	import hardening
@@ -75,8 +115,7 @@ antonycasa.weelume.com {
 		# 磁盘上并没有对应文件，必须回落到 index.html，否则一刷新就 404
 		handle {
 			root * /srv/site
-			try_files {path} /index.html
-			file_server
+			import spa
 		}
 	}
 
@@ -93,8 +132,7 @@ admin.antonycasa.weelume.com {
 
 		handle {
 			root * /srv/admin
-			try_files {path} /index.html
-			file_server
+			import spa
 		}
 	}
 
@@ -136,8 +174,7 @@ dev.antonycasa.weelume.com {
 
 		handle {
 			root * /srv/dev-site
-			try_files {path} /index.html
-			file_server
+			import spa
 		}
 	}
 
@@ -160,8 +197,7 @@ dev.admin.antonycasa.weelume.com {
 
 		handle {
 			root * /srv/dev-admin
-			try_files {path} /index.html
-			file_server
+			import spa
 		}
 	}
 

@@ -60,6 +60,19 @@ wsl -d Ubuntu -- bash /mnt/d/code/vivid/server/deploy/deploy.sh
 第 7 步的 reload 不能省：Caddyfile 是 bind mount 进容器的，改了内容 compose
 认为服务定义没变、容器不重建，Caddy 自己也不会重读，不显式 reload 配置就永远不生效。
 
+> ⚠️ 手动更新 Caddyfile 一律**就地写**（`scp` 覆盖、或 `cat 新的 > Caddyfile`），
+> **不要 `mv 新的 Caddyfile`**。这里 bind mount 绑的是**文件的 inode**（与 dist
+> 目录那条同一个道理）：`mv` 换掉 inode 之后，容器里那份就永远停在旧内容，
+> 而 `caddy reload --config /etc/caddy/Caddyfile` 读的正是它——于是 reload
+> 报成功、配置纹丝不动，宿主机上 `cat Caddyfile` 看到的又是新的，很难往这上面想。
+> 已经 `mv` 过了只能重建容器（`docker compose up -d --force-recreate --no-deps caddy`，
+> 80/443 断几秒；证书在 `data/caddy/data` 的 bind mount 上，不会重签）。
+> 判断方法：
+>
+> ```bash
+> diff <(cat Caddyfile) <(docker compose exec -T caddy cat /etc/caddy/Caddyfile </dev/null)
+> ```
+
 ## 发布「管理端登录鉴权」这一支
 
 这一支同时改了配置、表结构和前后端契约，**顺序错了会有肉眼可见的故障**，
